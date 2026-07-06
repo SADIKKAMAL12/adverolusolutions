@@ -1309,6 +1309,7 @@ export function AdminSettingsPage({ paymentMethods, businessTypes, setStore }) {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {[
             { label: 'WhatsApp OTP', icon: '📱', desc: 'Manage WhatsApp OTP configuration', path: '/admin/whatsapp' },
+            { label: 'Email OTP', icon: '✉️', desc: 'Configure SMTP and email OTP verification', path: '/admin/email-otp' },
             { label: 'Order Notifications', icon: '🔔', desc: 'WhatsApp alerts for orders & top-ups', path: '/admin/order-notifications' },
           ].map(item => (
             <button
@@ -1798,6 +1799,64 @@ export function AdminAgencyAdAccountsPage({ requests, users, setStore, platformP
   const [newPlatform, setNewPlatform] = useState({ name: '', color: '#6366f1' });
   const [addingPlatform, setAddingPlatform] = useState(false);
 
+  // Agency Settings tab — credit line color + top-up milestone awards
+  const [agencySettings, setAgencySettings] = useState({ creditLineColor: '#e8192c', milestones: [] });
+  const [agencySettingsLoaded, setAgencySettingsLoaded] = useState(false);
+  const [savingAgencySettings, setSavingAgencySettings] = useState(false);
+  const [milestoneForm, setMilestoneForm] = useState({
+    amount: '', label: '', icon: '🏆', scope: 'global', accountIds: [], rewardMessage: '', color: '#f59e0b',
+  });
+
+  const loadAgencySettings = async () => {
+    try {
+      const data = await fetch('/api/agency-settings', { credentials: 'same-origin' }).then(r => r.json());
+      setAgencySettings(data);
+    } catch { /* keep defaults if settings can't be loaded */ }
+    setAgencySettingsLoaded(true);
+  };
+
+  const saveAgencySettings = async (next) => {
+    setSavingAgencySettings(true);
+    try {
+      const data = await fetch('/api/agency-settings', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      }).then(r => r.json());
+      setAgencySettings(data);
+    } catch { /* non-fatal */ }
+    setSavingAgencySettings(false);
+  };
+
+  const addMilestone = () => {
+    if (!milestoneForm.amount || !milestoneForm.label) return;
+    const milestone = {
+      id: Date.now().toString(),
+      amount: Number(milestoneForm.amount),
+      label: milestoneForm.label,
+      icon: milestoneForm.icon || '🏆',
+      scope: milestoneForm.scope || 'global',
+      accountIds: milestoneForm.scope === 'specific' ? milestoneForm.accountIds : [],
+      color: milestoneForm.color || '#f59e0b',
+      rewardMessage: milestoneForm.rewardMessage || '',
+    };
+    const next = { ...agencySettings, milestones: [...agencySettings.milestones, milestone].sort((a, b) => a.amount - b.amount) };
+    setAgencySettings(next);
+    saveAgencySettings(next);
+    setMilestoneForm({ amount: '', label: '', icon: '🏆', scope: 'global', accountIds: [], color: '#f59e0b', rewardMessage: '' });
+  };
+
+  const removeMilestone = (id) => {
+    const next = { ...agencySettings, milestones: agencySettings.milestones.filter(m => m.id !== id) };
+    setAgencySettings(next);
+    saveAgencySettings(next);
+  };
+
+  useEffect(() => {
+    if (tab === 'agency' && !agencySettingsLoaded) loadAgencySettings();
+  }, [tab]);
+
   const updatePlatform = (id, changes) => {
     setPlatforms(ps => ps.map(p => p.id === id ? { ...p, ...changes } : p));
   };
@@ -1993,6 +2052,7 @@ export function AdminAgencyAdAccountsPage({ requests, users, setStore, platformP
           ["requests",  "📋 Account Requests"],
           ["topups",    `💳 Top-up Requests${statCounts.topups_pending > 0 ? ` (${statCounts.topups_pending})` : ''}`],
           ["platforms", "⚙ Platform Settings"],
+          ["agency",    "🏆 Agency Settings"],
         ].map(([key, label]) => (
           <button key={key} onClick={() => { setTab(key); setSearch(""); setStatusFilter("All"); }}
             style={{ padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit",
@@ -2291,6 +2351,171 @@ export function AdminAgencyAdAccountsPage({ requests, users, setStore, platformP
             {savingPrices ? "Saving…" : "💾 Save Platform Settings"}
           </Btn>
         </>
+      )}
+
+      {tab === "agency" && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Credit Line Color */}
+          <Card style={{ padding: '22px 24px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.g800, marginBottom: 4 }}>Credit Line Bar Color</div>
+            <div style={{ fontSize: 12, color: C.g500, marginBottom: 14 }}>
+              Sets the glow color of the credit line progress bar visible to users on their account page.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input
+                type="color"
+                value={agencySettings.creditLineColor || '#e8192c'}
+                onChange={e => setAgencySettings(s => ({ ...s, creditLineColor: e.target.value }))}
+                style={{ width: 44, height: 36, border: 'none', borderRadius: 8, cursor: 'pointer', padding: 2, background: 'none' }}
+              />
+              <input
+                value={agencySettings.creditLineColor || '#e8192c'}
+                onChange={e => setAgencySettings(s => ({ ...s, creditLineColor: e.target.value }))}
+                maxLength={7}
+                placeholder="#e8192c"
+                style={{ width: 110, border: `1px solid ${C.g200}`, borderRadius: 8, padding: '7px 10px', fontSize: 13, fontFamily: 'monospace', background: C.g50, color: C.text, outline: 'none' }}
+              />
+              <div style={{ flex: 1, height: 10, borderRadius: 99, background: C.g200, overflow: 'hidden', position: 'relative' }}>
+                <div style={{
+                  height: '100%', width: '60%', borderRadius: 99,
+                  background: agencySettings.creditLineColor || '#e8192c',
+                  boxShadow: `0 0 14px ${agencySettings.creditLineColor || '#e8192c'}`,
+                }} />
+              </div>
+              <Btn size="sm" onClick={() => saveAgencySettings(agencySettings)} disabled={savingAgencySettings}>
+                {savingAgencySettings ? 'Saving…' : 'Save'}
+              </Btn>
+            </div>
+          </Card>
+
+          {/* Milestone Awards */}
+          <Card style={{ padding: '22px 24px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.g800, marginBottom: 2 }}>Milestone Awards</div>
+            <div style={{ fontSize: 12, color: C.g500, marginBottom: 18 }}>
+              Create top-up milestones that unlock achievement badges for users. Set a top-up threshold, icon, and whether it applies to all accounts or specific ones.
+            </div>
+
+            <div style={{ background: C.g50, border: `1px solid ${C.g200}`, borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.g500, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12 }}>Add Milestone</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 80px 90px 1fr', gap: 10, alignItems: 'end' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.g500, marginBottom: 4, fontWeight: 600 }}>Icon</div>
+                  <input
+                    value={milestoneForm.icon}
+                    onChange={e => setMilestoneForm(f => ({ ...f, icon: e.target.value }))}
+                    placeholder="🏆"
+                    maxLength={4}
+                    style={{ width: '100%', border: `1px solid ${C.g200}`, borderRadius: 8, padding: '8px 10px', fontSize: 20, textAlign: 'center', background: C.card, color: C.text, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.g500, marginBottom: 4, fontWeight: 600 }}>Award Name</div>
+                  <input
+                    value={milestoneForm.label}
+                    onChange={e => setMilestoneForm(f => ({ ...f, label: e.target.value }))}
+                    placeholder="Gold Tier"
+                    style={{ width: '100%', border: `1px solid ${C.g200}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.g500, marginBottom: 4, fontWeight: 600 }}>Color</div>
+                  <input
+                    type="color"
+                    value={milestoneForm.color || '#f59e0b'}
+                    onChange={e => setMilestoneForm(f => ({ ...f, color: e.target.value }))}
+                    style={{ width: '100%', height: 38, border: `1px solid ${C.g200}`, borderRadius: 8, cursor: 'pointer', padding: 2, background: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.g500, marginBottom: 4, fontWeight: 600 }}>Amount ($)</div>
+                  <input
+                    type="number"
+                    value={milestoneForm.amount}
+                    onChange={e => setMilestoneForm(f => ({ ...f, amount: e.target.value }))}
+                    placeholder="10000"
+                    min="1"
+                    style={{ width: '100%', border: `1px solid ${C.g200}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.g500, marginBottom: 4, fontWeight: 600 }}>Applies To</div>
+                  <select
+                    value={milestoneForm.scope}
+                    onChange={e => setMilestoneForm(f => ({ ...f, scope: e.target.value }))}
+                    style={{ width: '100%', border: `1px solid ${C.g200}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', cursor: 'pointer', boxSizing: 'border-box' }}
+                  >
+                    <option value="global">Everyone</option>
+                    <option value="specific">Specific account</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: C.g500, marginBottom: 4, fontWeight: 600 }}>
+                  Reward Message <span style={{ fontWeight: 400, opacity: 0.7 }}>(shown to user when they reach this milestone)</span>
+                </div>
+                <textarea
+                  value={milestoneForm.rewardMessage}
+                  onChange={e => setMilestoneForm(f => ({ ...f, rewardMessage: e.target.value }))}
+                  placeholder={`e.g. Congratulations! You've reached ${milestoneForm.label || 'Gold Tier'} — enjoy 5% cashback on your next top-up as a thank you from us! 🎉`}
+                  rows={2}
+                  style={{ width: '100%', border: `1px solid ${C.g200}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                />
+              </div>
+
+              {milestoneForm.scope === 'specific' && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 11, color: C.g500, marginBottom: 4, fontWeight: 600 }}>Account IDs (comma-separated)</div>
+                  <input
+                    value={(milestoneForm.accountIds || []).join(', ')}
+                    onChange={e => setMilestoneForm(f => ({ ...f, accountIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+                    placeholder="e.g. 1782939900368, 1782930083318"
+                    style={{ width: '100%', border: `1px solid ${C.g200}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                <Btn onClick={addMilestone} disabled={!milestoneForm.amount || !milestoneForm.label}>+ Add Milestone</Btn>
+              </div>
+            </div>
+
+            {agencySettings.milestones.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 20px', color: C.g400, fontSize: 13 }}>
+                No milestones yet. Add one above to motivate clients to top up more.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {agencySettings.milestones.map(m => (
+                  <div key={m.id} style={{ padding: '14px 16px', borderRadius: 12, border: `1.5px solid ${m.color || C.g200}30`, background: `${m.color || '#f59e0b'}08` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 24, flexShrink: 0 }}>{m.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: m.color || C.g800 }}>{m.label}</div>
+                        <div style={{ fontSize: 12, color: C.g500, marginTop: 2 }}>
+                          ${Number(m.amount).toLocaleString()} threshold · {m.scope === 'global' ? 'All accounts' : `${(m.accountIds || []).length} specific account${(m.accountIds || []).length !== 1 ? 's' : ''}`}
+                        </div>
+                      </div>
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: m.color || '#f59e0b', flexShrink: 0, boxShadow: `0 0 8px ${m.color || '#f59e0b'}` }} />
+                      <button
+                        onClick={() => removeMilestone(m.id)}
+                        style={{ background: 'none', border: `1px solid ${C.g200}`, borderRadius: 7, padding: '4px 10px', fontSize: 12, color: C.red, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    {m.rewardMessage && (
+                      <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: `${m.color || '#f59e0b'}12`, border: `1px dashed ${m.color || '#f59e0b'}40`, fontSize: 12, color: C.g600, lineHeight: 1.5 }}>
+                        <span style={{ fontWeight: 700, color: m.color || '#f59e0b', marginRight: 5 }}>🎁 Reward:</span>
+                        {m.rewardMessage}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
       )}
 
       {/* Request Detail Modal */}

@@ -23,6 +23,7 @@ import AdminLoginPage from './user/AdminLoginPage.jsx';
 import AdminDashboard from './admin/AdminDashboard.jsx';
 import { AdminUsersPage, AdminInventoryPage, AdminOrdersPage, AdminDepositsPage, AdminTicketsPage, AdminReportsPage, AdminSettingsPage, AdminAgencyAdAccountsPage } from './admin/AdminOtherPages.jsx';
 import AdminWhatsAppPage from './admin/AdminWhatsAppPage.jsx';
+import AdminEmailOTPPage from './admin/AdminEmailOTPPage.jsx';
 import AdminStructureAssetsPage from './admin/AdminStructureAssetsPage.jsx';
 import AdminAllOrdersPage from './admin/AdminAllOrdersPage.jsx';
 import AdminPolicyManagementPage from './admin/AdminPolicyManagementPage.jsx';
@@ -108,6 +109,7 @@ function AdminApp() {
           <Route path="/admin/policies/account-types" element={<AdminAccountTypesPage />} />
           <Route path="/admin/settings" element={<AdminSettingsPage paymentMethods={store.paymentMethods || []} businessTypes={store.businessTypes || []} setStore={setStore} />} />
           <Route path="/admin/whatsapp" element={<AdminWhatsAppPage />} />
+          <Route path="/admin/email-otp" element={<AdminEmailOTPPage />} />
           <Route path="/admin/structure-assets" element={<AdminStructureAssetsPage />} />
           <Route path="/" element={<AdminDashboard users={store.users || []} orders={store.orders || []} deposits={store.deposits || []} />} />
         </ThemedAdminMain>

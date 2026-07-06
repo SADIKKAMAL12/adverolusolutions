@@ -30,14 +30,27 @@ export function Topbar({ crumbs = [] }) {
   return (
     <header className="topbar">
       <div className="topbar__crumbs">
-        {crumbs.map((c, i) => (
-          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: i === crumbs.length - 1 ? 'var(--ink)' : 'var(--muted)', fontWeight: i === crumbs.length - 1 ? 500 : 400 }}>
-              {c}
+        {crumbs.map((c, i) => {
+          const isObj = c && typeof c === 'object';
+          const label = isObj ? c.label : c;
+          const onClick = isObj ? c.onClick : undefined;
+          const isLast = i === crumbs.length - 1;
+          return (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span
+                onClick={onClick}
+                style={{
+                  color: isLast ? 'var(--ink)' : 'var(--muted)',
+                  fontWeight: isLast ? 500 : 400,
+                  cursor: onClick ? 'pointer' : 'default',
+                }}
+              >
+                {label}
+              </span>
+              {i < crumbs.length - 1 && <span style={{ color: 'var(--muted-2)' }}>/</span>}
             </span>
-            {i < crumbs.length - 1 && <span style={{ color: 'var(--muted-2)' }}>/</span>}
-          </span>
-        ))}
+          );
+        })}
       </div>
       <div className="topbar__spacer" />
 
