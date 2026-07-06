@@ -32,9 +32,12 @@ const DEFAULTS = {
   smtp_port: '465',
   smtp_user: 'support@adversolutions.agency',
   smtp_pass: '',
+  policy_orders_enabled: true,
 }
 
-async function readSettings() {
+// Exported so other handlers (e.g. policy-orders.js) can check admin-controlled
+// settings without needing their own separate storage/read path.
+export async function readSettings() {
   const sb = getSupabase()
   if (sb) {
     const { data, error } = await sb

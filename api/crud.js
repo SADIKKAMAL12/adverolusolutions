@@ -418,8 +418,16 @@ async function handlePurchases(req, res) {
     const userId = req.user?.role === 'admin' ? (body.user_id || req.user?.id) : req.user?.id
     if (!userId) return res.status(400).json({ error: 'user_id required' })
 
-    const cost = Number(body.price || 0)
-    if (cost < 0) return res.status(400).json({ error: 'Invalid price' })
+    // Price, title, and platform must come from the server's own product record —
+    // never trust these from the client, or a request could be tampered with to
+    // pay a fraction of the real price for a real product.
+    const productId = body.product_id || null
+    if (!productId) return res.status(400).json({ error: 'product_id required' })
+    const { data: product, error: productErr } = await sb
+      .from('inventory_products').select('price, title, platform').eq('id', productId).single()
+    if (productErr || !product) return res.status(404).json({ error: 'Product not found' })
+    const cost = Number(product.price || 0)
+    if (isNaN(cost) || cost < 0) return res.status(400).json({ error: 'Invalid product price' })
 
     // Fresh server-side balance check — never trust client-side balance
     const { data: userData } = await sb.from('users').select('balance').eq('id', userId).single()
@@ -443,9 +451,9 @@ async function handlePurchases(req, res) {
     const insertData = {
       id:            body.id || `PUR-${Date.now()}`,
       user_id:       userId,
-      product_id:    body.product_id || null,
-      product_title: body.product_title || null,
-      platform:      body.platform || null,
+      product_id:    productId,
+      product_title: product.title    || null,
+      platform:      product.platform || null,
       line_id:       lineId,
       price:         cost,
       email:         body.email || '',
@@ -487,6 +495,62 @@ async function handlePurchases(req, res) {
     })()
 
     return res.status(201).json({ success: true, ...data })
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' })
+}
+
+// ── Support tickets handler (in-memory, but with proper ownership checks —
+// this used to fall through to the generic mock CRUD below with no ownership
+// filtering at all, meaning every user could see and modify everyone else's
+// tickets) ──────────────────────────────────────────────────────────────────
+async function handleSupportTickets(req, res) {
+  const isAdmin = req.user?.role === 'admin'
+  const tickets = stores.support_tickets
+
+  if (req.method === 'GET') {
+    const uid = isAdmin ? (req.query.user_id || null) : req.user?.id
+    const filtered = uid ? tickets.filter(t => String(t.user_id) === String(uid)) : [...tickets]
+    return res.status(200).json(filtered)
+  }
+
+  if (req.method === 'POST') {
+    if (!req.user?.id) return res.status(401).json({ error: 'Authentication required' })
+    const body = req.body || {}
+    const ticket = {
+      id: `TCK-${Date.now()}`,
+      // Force identity from the verified session — never trust body.user_id
+      user_id:    req.user.id,
+      user_email: req.user.email || null,
+      subject:    String(body.subject || '').slice(0, 255),
+      category:   String(body.category || 'Other').slice(0, 100),
+      message:    String(body.message || '').slice(0, 5000),
+      status:     'open',
+      created_at: new Date().toISOString(),
+    }
+    tickets.unshift(ticket)
+    return res.status(201).json({ success: true, ...ticket })
+  }
+
+  if (req.method === 'PUT') {
+    // Only admins may update tickets (e.g. change status / add notes)
+    if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
+    const { id, ...updates } = req.body || {}
+    if (!id) return res.status(400).json({ error: 'ID required for update' })
+    const idx = tickets.findIndex(t => String(t.id) === String(id))
+    if (idx === -1) return res.status(404).json({ error: 'Ticket not found' })
+    tickets[idx] = { ...tickets[idx], ...updates }
+    return res.status(200).json({ success: true, ...tickets[idx] })
+  }
+
+  if (req.method === 'DELETE') {
+    if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
+    const id = req.query.id
+    if (!id) return res.status(400).json({ error: 'ID required for delete' })
+    const idx = tickets.findIndex(t => String(t.id) === String(id))
+    if (idx === -1) return res.status(404).json({ error: 'Not found' })
+    tickets.splice(idx, 1)
+    return res.status(200).json({ success: true })
   }
 
   return res.status(405).json({ error: 'Method not allowed' })
@@ -599,6 +663,30 @@ async function handleAdAccountRequests(req, res) {
     }
     if (amount < 0 || isNaN(amount)) return res.status(400).json({ error: 'Invalid amount' })
 
+    // ── Server-side minimum price enforcement ──────────────────────────────────
+    // The client computes `amount` from the platform's real pricing, but a request
+    // can be tampered with client-side (e.g. amount=0.01). We can't know the exact
+    // topup the user chose above the minimum, but we CAN recompute the legitimate
+    // floor for this platform/request-type and reject anything below it.
+    const isTopupRequest = String(body.account_name || '').startsWith('Top-up:')
+    const platformId = (body.platform || '').toLowerCase()
+    let platformFeePercent = 6
+    if (platformId) {
+      const { data: priceRow } = await sb
+        .from('platform_prices').select('price, fee, min_topup').eq('id', platformId).maybeSingle()
+      const servicePrice = Number(priceRow?.price ?? 50)
+      const feePercent   = Number(priceRow?.fee ?? 6)
+      const minTopup     = Number(priceRow?.min_topup ?? 200)
+      platformFeePercent = feePercent
+      const minTopupWithFee = minTopup * (1 + feePercent / 100)
+      const requiredMinimum = isTopupRequest ? minTopupWithFee : servicePrice + minTopupWithFee
+      if (amount < requiredMinimum - 0.01) {
+        return res.status(400).json({
+          error: `Amount is below the minimum required for this request ($${requiredMinimum.toFixed(2)}).`,
+        })
+      }
+    }
+
     // ── Balance check: user must have enough balance to cover the amount ──
     if (amount > 0 && userId) {
       const { data: userData, error: balErr } = await sb
@@ -616,14 +704,16 @@ async function handleAdAccountRequests(req, res) {
         .from('users').update({ balance: newBalance }).eq('id', userId)
       if (deductErr) return res.status(500).json({ error: deductErr.message })
       // Record the transaction
-      await sb.from('transactions').insert({
-        user_id: userId,
-        type: 'Agency Account Request',
-        method: 'Balance Deduction',
-        amount: -amount,
-        status: 'pending',
-        date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      }).catch(() => {})
+      try {
+        await sb.from('transactions').insert({
+          user_id: userId,
+          type: 'Agency Account Request',
+          method: 'Balance Deduction',
+          amount: -amount,
+          status: 'pending',
+          date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        })
+      } catch { /* non-fatal: request still proceeds even if the log entry fails */ }
     }
 
     const id = String(Date.now())
@@ -634,6 +724,15 @@ async function handleAdAccountRequests(req, res) {
     let pageLinks = body.page_links || []
     if (typeof pageLinks === 'string') {
       pageLinks = pageLinks.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+    }
+
+    // Top-ups: the amount submitted from the UI is topup + platform fee combined.
+    // The balance deduction above correctly charges that full total, but the
+    // credit-line/milestone tracking (which sums this `amount` field) should only
+    // count the actual topup principal — so back out the fee for stored records.
+    let storedAmount = amount
+    if (isTopupRequest && amount > 0) {
+      storedAmount = parseFloat((amount / (1 + platformFeePercent / 100)).toFixed(2))
     }
 
     const record = {
@@ -648,7 +747,7 @@ async function handleAdAccountRequests(req, res) {
       bm_id:          body.bm_id || body.business_center_id || null,
       page_links:     pageLinks,
       status:         'pending',
-      amount:         Number(body.amount   || 0),
+      amount:         storedAmount,
       request_id:     `#AAR-${id}`,
       submitted_at:   submitted,
     }
@@ -713,6 +812,22 @@ export default async function handler(req, res) {
     if (table === 'inventory_lines')     return handleInventoryLines(req, res)
     if (table === 'purchases')           return handlePurchases(req, res)
     if (table === 'ad_account_requests') return handleAdAccountRequests(req, res)
+  }
+  if (table === 'support_tickets') return handleSupportTickets(req, res)
+
+  // structure_orders / structure_drafts have their own dedicated, properly
+  // access-controlled handlers (api/structure-orders.js, api/structure-drafts.js)
+  // which enforce ownership and admin-only status changes. They must NEVER be
+  // reachable through this generic fallback, or those checks (and the
+  // server-side price validation) could be bypassed entirely.
+  if (table === 'structure_orders' || table === 'structure_drafts') {
+    return res.status(403).json({ error: 'Use the dedicated /api/structure-orders or /api/structure-drafts endpoint for this table.' })
+  }
+
+  // Everything else remaining here is legacy/reference data with no per-user
+  // ownership model — reads stay open, but only admins may write.
+  if (method !== 'GET' && req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin only' })
   }
 
   const store = stores[table] || []

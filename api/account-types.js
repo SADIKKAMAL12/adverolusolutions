@@ -29,6 +29,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
     const { name, logo } = req.body || {}
     if (!name?.trim()) return res.status(400).json({ error: 'Name required' })
     const { data: existing } = await sb.from('account_types').select('sort_order').order('sort_order', { ascending: false }).limit(1)
@@ -41,6 +42,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
     const { id, ...updates } = req.body || {}
     if (!id) return res.status(400).json({ error: 'ID required' })
     if (updates.name) updates.name = updates.name.trim()
@@ -53,6 +55,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
     const id = req.query.id
     if (!id) return res.status(400).json({ error: 'ID required' })
     const { error } = await sb.from('account_types').delete().eq('id', id)

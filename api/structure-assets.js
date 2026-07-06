@@ -17,7 +17,9 @@ const DEFAULTS = [
 ]
 
 // Lazy-init from sharedState (which lives in the cached crud.js module)
-function getAssets() {
+// Exported so other handlers (e.g. structure-orders.js) can price against the
+// same live, admin-controlled asset list instead of trusting client input.
+export function getAssets() {
   if (!sharedState.structureAssets) {
     sharedState.structureAssets = DEFAULTS.map(a => ({ ...a }))
   }
@@ -32,6 +34,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
     const body = req.body || {}
     const idx = assets.findIndex(a => a.key === body.key)
     if (idx === -1) return res.status(404).json({ error: 'Asset not found' })
@@ -40,6 +43,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
     const body = req.body || {}
     if (!body.key || assets.find(a => a.key === body.key)) {
       return res.status(400).json({ error: 'Key required or already exists' })

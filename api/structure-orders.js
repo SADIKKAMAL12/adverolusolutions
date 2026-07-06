@@ -1,4 +1,5 @@
 import { stores } from './crud.js'
+import { getAssets } from './structure-assets.js'
 
 export default async function handler(req, res) {
   const method  = req.method
@@ -7,6 +8,16 @@ export default async function handler(req, res) {
   const orders  = stores.structure_orders
 
   if (method === 'POST') {
+    const nodes = Array.isArray(req.body.nodes) ? req.body.nodes : []
+    const edges = Array.isArray(req.body.edges) ? req.body.edges : []
+
+    // Price must come from the server's own current asset list — never trust
+    // the client-computed total_price, or an order could be submitted at any
+    // self-declared price regardless of what assets were actually selected.
+    const assets = getAssets()
+    const priceByKey = new Map(assets.map(a => [a.key, Number(a.base_price) || 0]))
+    const totalPrice = nodes.reduce((sum, n) => sum + (priceByKey.get(n.type) || 0), 0)
+
     const order = {
       id: Date.now(),
       // Force user identity from the verified session — never trust the body
@@ -16,11 +27,11 @@ export default async function handler(req, res) {
       draft_id:   req.body.draft_id   != null ? String(req.body.draft_id) : null,
       order_code: 'STR-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
       name:       req.body.name       || 'Structure Order',
-      nodes_json: JSON.stringify(req.body.nodes || []),
-      edges_json: JSON.stringify(req.body.edges || []),
-      total_price: req.body.total_price || 0,
-      node_count:  req.body.node_count  || 0,
-      edge_count:  req.body.edge_count  || 0,
+      nodes_json: JSON.stringify(nodes),
+      edges_json: JSON.stringify(edges),
+      total_price: parseFloat(totalPrice.toFixed(2)),
+      node_count:  nodes.length,
+      edge_count:  edges.length,
       status:      'pending',
       admin_notes: '',
       submitted_at: new Date().toISOString(),

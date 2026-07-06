@@ -1,6 +1,7 @@
 import { google } from 'googleapis'
 import { readFileSync } from 'fs'
 import { sendOrderNotification } from './admin/order-notifications.js'
+import { readSettings } from './admin/platform-settings.js'
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID || '1FdlN8bMvldkuDnSX9iVCpRWAs1K4xfAQTMlh402L8e4'
 const SA_KEY_FILE = process.env.GOOGLE_SA_KEY_FILE || '/etc/adversolutions/google-sa.json'
@@ -32,10 +33,26 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Admin-controlled toggle — this endpoint is intentionally public (no login
+  // required), but admins can disable it entirely from platform settings.
+  const settings = await readSettings()
+  if (settings.policy_orders_enabled === false) {
+    return res.status(403).json({ error: 'Policy orders are currently disabled.' })
+  }
+
   const { name, email, account_type, payment_method, amount, policy_type, language } = req.body || {}
 
   if (!name || !email || !account_type || !payment_method || !amount) {
     return res.status(400).json({ error: 'Missing required fields' })
+  }
+
+  // Basic sanity bound on the client-supplied amount — this flow only writes
+  // a "Pending Payment" row for manual admin review (no balance/product is
+  // granted automatically), so there's no direct financial exploit here, but
+  // reject obviously-bogus values to keep the sheet clean.
+  const parsedAmount = Number(amount)
+  if (!isFinite(parsedAmount) || parsedAmount <= 0 || parsedAmount > 1_000_000) {
+    return res.status(400).json({ error: 'Invalid amount' })
   }
 
   try {
