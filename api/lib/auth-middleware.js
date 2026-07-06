@@ -73,12 +73,10 @@ export function isPublicPath(method, pathname, searchParams) {
   if (pathname === '/api/account-types' && method === 'GET') return true
   if (pathname === '/api/admin/platform-settings' && method === 'GET') return true
   if (pathname === '/api/admin/upload-asset' && method === 'POST') return true
-  // User registration: POST /api/crud?table=users
-  if (pathname === '/api/crud' && method === 'POST') {
-    const table = typeof searchParams?.get === 'function'
-      ? searchParams.get('table')
-      : searchParams?.table
-    if (table === 'users') return true
-  }
+  // Registration goes exclusively through /api/auth/register now — the old
+  // POST /api/crud?table=users path used to double as a second, weaker
+  // registration flow (client-side password hashing, no session cookie set,
+  // no validation that the hash was even well-formed). Removed as a public
+  // path; the generic users handler now requires admin for any write.
   return false
 }

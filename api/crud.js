@@ -42,14 +42,18 @@ async function handleUsers(req, res) {
   }
 
   if (req.method === 'POST') {
-    // Registration — req.user is null here (public route)
+    // Self-registration goes exclusively through /api/auth/register now
+    // (proper server-side bcrypt + session cookie in one step). This path
+    // is admin-only — reserved for a future "create user manually" admin
+    // feature, not a second public registration flow.
+    if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
     const body = { ...(req.body || {}) }
     if (!body.id) body.id = crypto.randomUUID()
-    // Force safe defaults — callers cannot self-assign admin role or arbitrary balance
-    body.role     = 'user'
-    body.status   = 'active'
-    body.balance  = 0
-    body.accounts = 0
+    // Force safe defaults even for admin-created accounts
+    body.role     = body.role === 'admin' ? 'admin' : 'user'
+    body.status   = body.status || 'active'
+    body.balance  = Number(body.balance) || 0
+    body.accounts = Number(body.accounts) || 0
     const { data, error } = await sb.from('users').insert(body).select().single()
     if (error) {
       // Surface duplicate-email as a friendly message
