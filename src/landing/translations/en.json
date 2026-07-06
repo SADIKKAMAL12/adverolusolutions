@@ -1,0 +1,172 @@
+{
+  "lang": "English",
+  "dir": "ltr",
+  "navbar": {
+    "home": "Home",
+    "platforms": "Platforms",
+    "pricing": "Pricing",
+    "features": "Features",
+    "faq": "FAQ",
+    "contact": "Contact",
+    "login": "Log In",
+    "cta": "Access Dashboard"
+  },
+  "hero": {
+    "badge": "Trusted by 500+ Agencies",
+    "headline": "Scale Your Campaigns With Trusted Agency Accounts",
+    "subheadline": "Instant access to Meta, Google, TikTok, Snapchat and Bing advertising accounts for agencies and scaling brands.",
+    "ctaPrimary": "Access Dashboard",
+    "ctaSecondary": "Explore Platforms",
+    "trust1": "Instant Delivery",
+    "trust2": "Verified Accounts",
+    "trust3": "Balance Warranty",
+    "trust4": "24/7 Support"
+  },
+  "platforms": {
+    "badge": "Supported Platforms",
+    "headline": "Premium Ad Accounts For Every Platform",
+    "subheadline": "Choose from the world's top advertising platforms and access reliable, high-performing agency accounts.",
+    "meta": {
+      "title": "Meta Ads",
+      "desc": "Meta advertising accounts with agency-level stability and high spending limits."
+    },
+    "google": {
+      "title": "Google Ads",
+      "desc": "Google Ads Agency accounts for large-scale, high-performance campaigns."
+    },
+    "tiktok": {
+      "title": "TikTok Ads",
+      "desc": "TikTok Ads Agency accounts ideal for reaching your audience quickly."
+    },
+    "snapchat": {
+      "title": "Snapchat Ads",
+      "desc": "Snapchat Ads Agency accounts for targeted and profitable campaigns."
+    },
+    "bing": {
+      "title": "Bing Ads",
+      "desc": "Bing Ads Agency accounts to reach qualified audiences."
+    },
+    "available": "Available",
+    "verified": "Verified",
+    "learnMore": "Learn more"
+  },
+  "features": {
+    "badge": "Why Choose Us",
+    "headline": "Everything You Need to Scale",
+    "instant": {
+      "title": "Instant Delivery",
+      "desc": "Get your accounts in just a few minutes."
+    },
+    "verified": {
+      "title": "Verified Accounts",
+      "desc": "All accounts are verified and ready to use."
+    },
+    "warranty": {
+      "title": "Balance Warranty",
+      "desc": "We guarantee balance and account stability."
+    },
+    "support": {
+      "title": "24/7 Support",
+      "desc": "Our team is available 24/7 for you."
+    },
+    "secure": {
+      "title": "Secure & Reliable",
+      "desc": "Your data and accounts are 100% secure."
+    },
+    "dashboard": {
+      "title": "Advanced Dashboard",
+      "desc": "Manage your accounts from a powerful dashboard."
+    }
+  },
+  "pricing": {
+    "badge": "Agency Account Pricing",
+    "headline": "Simple & Transparent Pricing",
+    "subheadline": "All accounts include balance warranty and instant delivery.",
+    "popular": "POPULAR",
+    "meta": {
+      "name": "Meta Agency Ads",
+      "price": "$70",
+      "period": "per account",
+      "features": ["Minimum topup: $100", "Topup fee: 6%", "Balance warranty", "Instant delivery", "Dashboard access", "24/7 support included"]
+    },
+    "google": {
+      "name": "Google Agency Ads",
+      "price": "$99",
+      "period": "per account",
+      "features": ["Minimum topup: $200", "Topup fee: 9%", "Balance warranty", "Instant delivery", "Dashboard access", "24/7 support included"]
+    },
+    "tiktok": {
+      "name": "TikTok Agency Ads",
+      "price": "$39",
+      "period": "per account",
+      "features": ["Minimum topup: $100", "Topup fee: 3%", "Balance warranty", "Instant delivery", "Dashboard access", "24/7 support included"]
+    },
+    "note": "Secure payments and flexible methods",
+    "chooseMeta": "Choose Meta Ads",
+    "chooseGoogle": "Choose Google Ads",
+    "chooseTikTok": "Choose TikTok Ads"
+  },
+  "faq": {
+    "badge": "FAQ",
+    "headline": "Frequently Asked Questions",
+    "subheadline": "Everything you need to know about our agency advertising accounts.",
+    "q1": "What is an agency ad account?",
+    "a1": "An agency ad account is a verified advertising account with higher trust scores and spending limits, designed for agencies and scaling brands.",
+    "q2": "Are the accounts verified?",
+    "a2": "Yes, all accounts are pre-verified with real history and high trust scores before delivery.",
+    "q3": "How fast is delivery?",
+    "a3": "Most accounts are delivered instantly after payment. Rare manual verification cases may take up to 2 hours.",
+    "q4": "Which platforms are supported?",
+    "a4": "We support Meta (Facebook/Instagram), Google Ads, TikTok Ads, Snapchat Ads, and Microsoft Bing Ads.",
+    "q5": "Do you provide balance warranty?",
+    "a5": "Yes, every account comes with a balance warranty. If an account gets restricted, we replace it within 48 hours.",
+    "q6": "Is dashboard access included?",
+    "a6": "Yes, all accounts include full dashboard access to manage orders, balances, and deposits.",
+    "q7": "What payment methods are accepted?",
+    "a7": "We accept bank transfers, Wise, Payoneer, cryptocurrency, and major credit cards.",
+    "q8": "Can I add my own payment method?",
+    "a8": "Yes, you can add and manage your own payment methods through our secure dashboard."
+  },
+  "cta": {
+    "headline": "Ready to Scale Your Advertising?",
+    "subheadline": "Join 500+ agencies and brands who trust AdverSolutions for their advertising accounts.",
+    "primary": "Access Dashboard",
+    "secondary": "Contact Us"
+  },
+  "footer": {
+    "tagline": "The #1 platform for verified and reliable agency advertising accounts.",
+    "nav": "Navigation",
+    "platforms": "Platforms",
+    "resources": "Resources",
+    "contact": "Contact",
+    "email": "contact@adversolutions.agency",
+    "chat": "Live chat 24/7",
+    "rights": "All rights reserved."
+  },
+  "billing": {
+    "title": "Meta Agency Billing",
+    "active": "Active",
+    "outstanding": "Outstanding balance",
+    "payNow": "Pay Now",
+    "paymentMethods": "Payment methods",
+    "addMethod": "Add payment method",
+    "creditLine": "Credit line",
+    "default": "Default",
+    "creditAvailable": "Credit available:",
+    "high": "High",
+    "company": "ADVERSOLUTIONS LLC",
+    "spendingLimit": "Account spending limit",
+    "remaining": "Remaining amount:",
+    "spent": "spent",
+    "limit": "spending limit",
+    "resets": "Resets manually",
+    "reset": "Reset now",
+    "transactions": "Recent transactions",
+    "viewAll": "View all transactions",
+    "date": "Date",
+    "description": "Description",
+    "amount": "Amount",
+    "status": "Status",
+    "paid": "Paid"
+  }
+}

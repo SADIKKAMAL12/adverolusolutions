@@ -1,0 +1,172 @@
+{
+  "lang": "Français",
+  "dir": "ltr",
+  "navbar": {
+    "home": "Accueil",
+    "platforms": "Plateformes",
+    "pricing": "Tarifs",
+    "features": "Fonctionnalités",
+    "faq": "FAQ",
+    "contact": "Contact",
+    "login": "Se connecter",
+    "cta": "Accéder au Dashboard"
+  },
+  "hero": {
+    "badge": "Approuvé par 500+ Agences",
+    "headline": "Développez Vos Campagnes Avec des Comptes Agence Vérifiés",
+    "subheadline": "Accédez instantanément à des comptes publicitaires Meta, Google, TikTok, Snapchat et Bing, conçus pour les marques et agences en croissance.",
+    "ctaPrimary": "Accéder au Dashboard",
+    "ctaSecondary": "Explorer les Plateformes",
+    "trust1": "Livraison Instantanée",
+    "trust2": "Comptes Vérifiés",
+    "trust3": "Garantie de Solde",
+    "trust4": "Support 24/7"
+  },
+  "platforms": {
+    "badge": "Plateformes Supportées",
+    "headline": "Comptes Publicitaires Premium pour Chaque Plateforme",
+    "subheadline": "Choisissez parmi les meilleures plateformes publicitaires au monde et accédez à des comptes agence fiables et performants.",
+    "meta": {
+      "title": "Meta Ads",
+      "desc": "Comptes publicitaires Meta Agence avec une stabilité et des limites élevées."
+    },
+    "google": {
+      "title": "Google Ads",
+      "desc": "Comptes Google Ads Agence pour des campagnes à grande échelle et performantes."
+    },
+    "tiktok": {
+      "title": "TikTok Ads",
+      "desc": "Comptes TikTok Ads Agence idéaux pour atteindre votre audience rapidement."
+    },
+    "snapchat": {
+      "title": "Snapchat Ads",
+      "desc": "Comptes Snapchat Ads Agence pour des campagnes rentables et ciblées."
+    },
+    "bing": {
+      "title": "Bing Ads",
+      "desc": "Comptes Bing Ads Agence pour toucher des audiences qualifiées."
+    },
+    "available": "Disponible",
+    "verified": "Vérifié",
+    "learnMore": "En savoir plus"
+  },
+  "features": {
+    "badge": "Pourquoi Nous Choisir",
+    "headline": "Tout Ce Dont Vous Avez Besoin Pour Scaler",
+    "instant": {
+      "title": "Livraison Instantanée",
+      "desc": "Accédez à vos comptes en quelques minutes seulement."
+    },
+    "verified": {
+      "title": "Comptes Vérifiés",
+      "desc": "Tous nos comptes sont vérifiés et prêts à l'emploi."
+    },
+    "warranty": {
+      "title": "Garantie de Solde",
+      "desc": "Nous garantissons le solde et la stabilité des comptes."
+    },
+    "support": {
+      "title": "Support 24/7",
+      "desc": "Notre équipe est disponible 24h/24 et 7j/7 pour vous."
+    },
+    "secure": {
+      "title": "Sécurisé & Fiable",
+      "desc": "Vos données et vos comptes sont 100% sécurisés."
+    },
+    "dashboard": {
+      "title": "Dashboard Avancé",
+      "desc": "Gérez vos comptes depuis un dashboard puissant."
+    }
+  },
+  "pricing": {
+    "badge": "Tarifs des Comptes Agence",
+    "headline": "Des Tarifs Simples et Transparents",
+    "subheadline": "Tous les comptes incluent une garantie sur le solde et une livraison instantanée.",
+    "popular": "POPULAIRE",
+    "meta": {
+      "name": "Meta Agency Ads",
+      "price": "$70",
+      "period": "par compte",
+      "features": ["Topup minimum : $100", "Frais de topup : 6%", "Garantie sur le solde", "Livraison instantanée", "Accès au dashboard", "Support inclus 24/7"]
+    },
+    "google": {
+      "name": "Google Agency Ads",
+      "price": "$99",
+      "period": "par compte",
+      "features": ["Topup minimum : $200", "Frais de topup : 9%", "Garantie sur le solde", "Livraison instantanée", "Accès au dashboard", "Support inclus 24/7"]
+    },
+    "tiktok": {
+      "name": "TikTok Agency Ads",
+      "price": "$39",
+      "period": "par compte",
+      "features": ["Topup minimum : $100", "Frais de topup : 3%", "Garantie sur le solde", "Livraison instantanée", "Accès au dashboard", "Support inclus 24/7"]
+    },
+    "note": "Paiements sécurisés et méthodes flexibles",
+    "chooseMeta": "Choisir Meta Ads",
+    "chooseGoogle": "Choisir Google Ads",
+    "chooseTikTok": "Choisir TikTok Ads"
+  },
+  "faq": {
+    "badge": "FAQ",
+    "headline": "Questions Fréquemment Posées",
+    "subheadline": "Tout ce que vous devez savoir sur nos comptes agence publicitaires.",
+    "q1": "Qu'est-ce qu'un compte agence ?",
+    "a1": "Un compte agence est un compte publicitaire vérifié avec des scores de confiance et des limites de dépense élevées, conçu pour les agences et les marques en croissance.",
+    "q2": "Les comptes sont-ils vérifiés ?",
+    "a2": "Oui, tous les comptes sont pré-vérifiés avec un historique réel et un score de confiance élevé avant livraison.",
+    "q3": "Combien de temps prend la livraison ?",
+    "a3": "La plupart des comptes sont livrés instantanément après paiement. Les rares cas de vérification manuelle peuvent prendre jusqu'à 2 heures.",
+    "q4": "Quelles plateformes sont disponibles ?",
+    "a4": "Nous supportons Meta (Facebook/Instagram), Google Ads, TikTok Ads, Snapchat Ads et Microsoft Bing Ads.",
+    "q5": "Fournissez-vous une garantie sur le solde ?",
+    "a5": "Oui, chaque compte inclut une garantie sur le solde. Si un compte est restreint, nous le remplaçons sous 48 heures.",
+    "q6": "L'accès au dashboard est-il inclus ?",
+    "a6": "Oui, tous les comptes incluent un accès complet au dashboard pour gérer les commandes, soldes et dépôts.",
+    "q7": "Quels sont les modes de paiement acceptés ?",
+    "a7": "Nous acceptons les virements bancaires, Wise, Payoneer, les cryptomonnaies et les cartes de crédit.",
+    "q8": "Puis-je ajouter un moyen de paiement personnel ?",
+    "a8": "Oui, vous pouvez ajouter et gérer vos propres moyens de paiement via notre dashboard sécurisé."
+  },
+  "cta": {
+    "headline": "Prêt à Scaler Votre Publicité ?",
+    "subheadline": "Rejoignez plus de 500 agences et marques qui font confiance à AdverSolutions pour leurs comptes publicitaires.",
+    "primary": "Accéder au Dashboard",
+    "secondary": "Nous Contacter"
+  },
+  "footer": {
+    "tagline": "La plateforme n°1 pour les comptes publicitaires agence vérifiés et fiables.",
+    "nav": "Navigation",
+    "platforms": "Plateformes",
+    "resources": "Ressources",
+    "contact": "Contact",
+    "email": "contact@adversolutions.agency",
+    "chat": "Live chat 24/7",
+    "rights": "Tous droits réservés."
+  },
+  "billing": {
+    "title": "Meta Agency Billing",
+    "active": "Active",
+    "outstanding": "Outstanding balance",
+    "payNow": "Pay Now",
+    "paymentMethods": "Payment methods",
+    "addMethod": "Add payment method",
+    "creditLine": "Credit line",
+    "default": "Default",
+    "creditAvailable": "Credit available:",
+    "high": "High",
+    "company": "ADVERSOLUTIONS LLC",
+    "spendingLimit": "Account spending limit",
+    "remaining": "Remaining amount:",
+    "spent": "spent",
+    "limit": "spending limit",
+    "resets": "Resets manually",
+    "reset": "Reset now",
+    "transactions": "Recent transactions",
+    "viewAll": "View all transactions",
+    "date": "Date",
+    "description": "Description",
+    "amount": "Amount",
+    "status": "Status",
+    "paid": "Paid"
+  }
+}

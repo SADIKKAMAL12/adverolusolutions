@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+whatsapp-server/node_modules/
+
+# Build output (compiled from src/ — never source of truth)
+dist/
+dist-landing/
+dist-policy/
+dist.bak-*/
+
+# Secrets — never commit real credentials
+.env
+.env.local
+
+# WhatsApp session data — active login/encryption keys for the connected
+# number, equivalent to a live session token. Never commit these.
+whatsapp-server/baileys_sessions/
+
+# Site-local persisted settings (fallback storage, not source code)
+data/
+
+# Logs
+*.log
+server.log
+
+# OS/editor cruft
+.DS_Store
+._*
+
+# Leftover archives / backups
+*.tgz
+*.bak-*
+
+# Claude-local scratch (not project source)
+.claude/
