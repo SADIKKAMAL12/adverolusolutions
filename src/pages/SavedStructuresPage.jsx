@@ -40,7 +40,9 @@ export default function SavedStructuresPage() {
   };
 
   const editOrder = (order) => {
-    setStore(s => ({ ...s, editingOrderId: order.id, loadDraftData: null }));
+    const nodes = order.nodes || (order.nodes_json ? JSON.parse(order.nodes_json) : []);
+    const edges = order.edges || (order.edges_json ? JSON.parse(order.edges_json) : []);
+    setStore(s => ({ ...s, loadDraftData: { id: order.id, name: order.name, nodes, edges, orderId: order.id } }));
     window.location.hash = '#/structure-builder';
   };
 

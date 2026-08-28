@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Btn } from '../shared/UI.jsx'
-import { C, getThemeColors } from '../shared/theme.js'
+import { getThemeColors } from '../shared/theme.js'
 import { useTheme } from '../shared/ThemeContext.jsx'
 
 const F = "'Plus Jakarta Sans','Inter',sans-serif"
@@ -115,7 +115,7 @@ export default function RichTextEditor({ value, onChange, minHeight = 280 }) {
         [contenteditable="true"] p { margin: 0 0 12px; }
         [contenteditable="true"] ul, [contenteditable="true"] ol { margin: 0 0 12px 18px; }
         [contenteditable="true"] li { margin-bottom: 6px; }
-        [contenteditable="true"] a { color: ${C.primary}; text-decoration: underline; }
+        [contenteditable="true"] a { color: ${TC.primary}; text-decoration: underline; }
       `}</style>
     </div>
   )

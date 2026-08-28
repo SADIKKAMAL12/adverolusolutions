@@ -213,6 +213,16 @@ export default function Support() {
                         {t.message}
                       </div>
                     )}
+                    {t.admin_reply && (
+                      <div style={{ marginTop: 4, padding: '8px 10px', background: 'var(--accent-50)', border: '1px solid var(--accent)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3 }}>
+                          Support reply
+                        </div>
+                        <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.5 }}>
+                          {t.admin_reply}
+                        </div>
+                      </div>
+                    )}
                     <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
                       Opened {fmtDate(t.created_at)}
                     </div>

@@ -152,6 +152,7 @@ export default function LandingPage({ assetsPath = "/assets", onNavigateLogin, o
           <nav className="adv-desktop-nav" style={{ alignItems: "center", gap: 4 }}>
             <a href="#home" className="adv-navlink" style={navLinkStyle}>{t.nav.home}</a>
             <a href="#platforms" className="adv-navlink" style={navLinkStyle}>{t.nav.platforms}</a>
+            <a href="#/products" className="adv-navlink" style={navLinkStyle}>Products</a>
             <a href="#pricing" className="adv-navlink" style={navLinkStyle}>{t.nav.pricing}</a>
             <a href="#calculator" className="adv-navlink" style={navLinkStyle}>{t.nav.calculator}</a>
             <a href="#faq" className="adv-navlink" style={navLinkStyle}>{t.nav.faq}</a>
@@ -187,7 +188,7 @@ export default function LandingPage({ assetsPath = "/assets", onNavigateLogin, o
         </div>
         {mobileMenuOpen && (
           <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", padding: "14px 20px 20px", display: "flex", flexDirection: "column", gap: 2, background: "#ffffff" }}>
-            {[["#home", t.nav.home], ["#platforms", t.nav.platforms], ["#pricing", t.nav.pricing], ["#calculator", t.nav.calculator], ["#faq", t.nav.faq]].map(([href, label]) => (
+            {[["#home", t.nav.home], ["#platforms", t.nav.platforms], ["#/products", "Products"], ["#pricing", t.nav.pricing], ["#calculator", t.nav.calculator], ["#faq", t.nav.faq]].map(([href, label]) => (
               <a key={href} href={href} onClick={() => setMobileMenuOpen(false)} style={{ padding: "12px 10px", color: "#171719", textDecoration: "none", fontSize: 15, fontWeight: 500, borderRadius: 10 }}>{label}</a>
             ))}
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -548,6 +549,7 @@ export default function LandingPage({ assetsPath = "/assets", onNavigateLogin, o
               <div style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><span style={{ width: 6, height: 6, borderRadius: 999, background: "#34c759" }} />{t.footer.live}</div>
               <a href="#" style={{ color: "#8a8a8e", textDecoration: "none" }}>{t.footer.terms}</a>
               <a href="#" style={{ color: "#8a8a8e", textDecoration: "none" }}>{t.footer.privacy}</a>
+              <a href="https://policy.adversolutions.agency/" style={{ color: "#8a8a8e", textDecoration: "none" }}>Policy</a>
             </div>
           </div>
         </div>

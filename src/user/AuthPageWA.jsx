@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "../shared/Router.jsx";
 
 /**
  * AuthPage — Sign in / Sign up screen for AdverSolutions
@@ -363,6 +364,7 @@ function SubmitButton({ loading, disabled, children }) {
 
 /* ---------------- sign in form ---------------- */
 function SignInForm({ onSwitch, onSignIn }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -387,7 +389,7 @@ function SignInForm({ onSwitch, onSignIn }) {
           <Checkbox checked={remember} onChange={setRemember}>
             Keep me signed in
           </Checkbox>
-          <a href="#" style={{ fontSize: 13, fontWeight: 700, color: BRAND, textDecoration: "none" }}>
+          <a href="#" onClick={(e) => { e.preventDefault(); navigate("/forgot-password"); }} style={{ fontSize: 13, fontWeight: 700, color: BRAND, textDecoration: "none" }}>
             Forgot password?
           </a>
         </div>

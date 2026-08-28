@@ -1,853 +1,566 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import { useTheme } from '../shared/ThemeContext.jsx'
-import { getThemeColors, C } from '../shared/theme.js'
+import { getAdminTheme, GlassCard, BRAND, BRAND_LIGHT, FONT } from '../shared/adminTheme.jsx'
 import { useStore, setStore as globalSetStore } from '../shared/store.js'
 import { fetchStructureOrders, updateStructureOrder } from '../lib/db.js'
 import StructurePreviewModal from '../builder/StructurePreviewModal.jsx'
 import {
   Layers, ShoppingBag, Building2, Search, Eye,
-  Clock, CheckCircle, XCircle, ArrowRight, RefreshCw, Loader,
-  AlertTriangle, Save, CheckCheck,
+  CheckCircle, RefreshCw, Loader, AlertTriangle, Save, CheckCheck, Package,
 } from 'lucide-react'
 
-/* ─── helpers ───────────────────────────────────────── */
 async function apiGet(table, params = {}) {
   const qs = new URLSearchParams({ table, ...params }).toString()
   const res = await fetch(`/api/crud?${qs}`)
   try { return await res.json() } catch { return [] }
 }
 async function apiPut(table, body) {
-  const res = await fetch(`/api/crud?table=${table}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const res = await fetch(`/api/crud?table=${table}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const data = await res.json()
   if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`)
   return data
 }
 
-/* ─── shared sub-components ─────────────────────────── */
-function StatusPill({ status, map }) {
-  const s = map[status] || { bg: '#f3f4f6', text: '#374151', label: status }
+const STATUS_COLORS = {
+  pending: '#f59e0b', processing: '#3b82f6', completed: '#22c55e', cancelled: '#ef4444',
+  in_review: '#3b82f6', approved: '#22c55e', rejected: '#ef4444',
+  building: '#3b82f6', done: '#22c55e', assets_missing: '#ec4899',
+};
+function StatusBadge({ status, labelMap }) {
+  const color = STATUS_COLORS[status] || '#9d9da6';
+  const label = labelMap?.[status] || (status ? status.replace('_', ' ') : 'Pending');
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      background: s.bg, color: s.text,
-      fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-      textTransform: 'capitalize', whiteSpace: 'nowrap',
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.text, flexShrink: 0 }} />
-      {s.label}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color, background: `${color}22`, padding: '5px 11px', borderRadius: 100, whiteSpace: 'nowrap', textTransform: 'capitalize' }}>
+      <span style={{ width: 6, height: 6, borderRadius: 999, background: color }} />
+      {label}
     </span>
-  )
+  );
 }
 
-function SectionSearch({ value, onChange, placeholder }) {
+function StatCard({ theme, label, value, tint }) {
   return (
-    <div style={{ position: 'relative', flex: 1, maxWidth: 300 }}>
-      <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-      <input
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          width: '100%', padding: '8px 10px 8px 30px', borderRadius: 8,
-          border: '1px solid #e5e7eb', fontSize: 12, fontFamily: 'inherit',
-          outline: 'none', boxSizing: 'border-box',
-        }}
-      />
-    </div>
-  )
+    <GlassCard theme={theme} style={{ padding: 18 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted }}>{label}</div>
+      <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800, color: tint, letterSpacing: '-0.01em' }}>{value}</div>
+    </GlassCard>
+  );
 }
 
-function EmptyState({ icon, title, subtitle }) {
+function ThemedSelect({ theme, value, onChange, options, disabled }) {
   return (
-    <div style={{ textAlign: 'center', padding: '56px 20px', color: '#9ca3af' }}>
-      <div style={{ fontSize: 48, marginBottom: 12 }}>{icon}</div>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#374151', marginBottom: 6 }}>{title}</div>
-      <div style={{ fontSize: 13 }}>{subtitle}</div>
+    <select
+      value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}
+      style={{
+        height: 34, padding: '0 28px 0 10px', borderRadius: 9,
+        border: `1px solid ${theme.border}`, background: theme.surfaceSunken, color: theme.text,
+        fontSize: 12, fontWeight: 600, fontFamily: FONT, appearance: 'none', WebkitAppearance: 'none',
+        backgroundImage: theme.mode === 'dark'
+          ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%239d9da6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`
+          : `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%236b6b72' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+}
+
+function FilterPills({ theme, value, onChange, options }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {options.map(o => {
+        const active = o.value === value;
+        return (
+          <button key={o.value} onClick={() => onChange(o.value)} style={{
+            padding: '9px 16px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, fontFamily: FONT,
+            border: active ? '1px solid transparent' : `1px solid ${theme.border}`, cursor: 'pointer',
+            background: active ? `linear-gradient(180deg,${BRAND_LIGHT},${BRAND})` : theme.surfaceSunken,
+            color: active ? '#fff' : theme.textMuted, boxShadow: active ? '0 8px 18px -8px rgba(255,45,85,0.5)' : 'none', transition: 'all .15s',
+          }}>{o.label}</button>
+        );
+      })}
     </div>
-  )
+  );
 }
 
-/* ═══════════════════════════════════════════════════
-   TAB 1 — PRE-VERIFIED ACCOUNTS ORDERS
-═══════════════════════════════════════════════════ */
-const PRE_STATUS = {
-  pending:    { bg: '#fef3c7', text: '#92400e', label: 'Pending' },
-  processing: { bg: '#dbeafe', text: '#1e40af', label: 'Processing' },
-  completed:  { bg: '#d1fae5', text: '#065f46', label: 'Completed' },
-  cancelled:  { bg: '#fee2e2', text: '#991b1b', label: 'Cancelled' },
+function SearchFilterBar({ theme, search, setSearch, placeholder, filters, filterValue, setFilterValue, onRefresh, loading }) {
+  return (
+    <GlassCard theme={theme} style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
+      <div style={{ flex: 1, minWidth: 220, display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 14px', borderRadius: 12, background: theme.surfaceSunken, border: `1px solid ${theme.border}` }}>
+        <Search size={15} style={{ color: theme.textFaint }} />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={placeholder} style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13.5, color: theme.text, fontFamily: FONT }} />
+      </div>
+      <FilterPills theme={theme} value={filterValue} onChange={setFilterValue} options={filters} />
+      {onRefresh && (
+        <button onClick={onRefresh} disabled={loading} style={{ height: 42, padding: '0 16px', borderRadius: 12, border: `1px solid ${theme.border}`, background: theme.surfaceSunken, color: theme.text, fontSize: 12.5, fontWeight: 700, cursor: loading ? 'default' : 'pointer', fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 8, opacity: loading ? 0.6 : 1 }}>
+          {loading ? <Loader size={13} /> : <RefreshCw size={13} />} Refresh
+        </button>
+      )}
+    </GlassCard>
+  );
 }
 
-function PreVerifiedTab({ TC, isDark }) {
-  const [store] = useStore()
-  const orders = store.orders || []
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [savingId, setSavingId] = useState(null)
-  const [loading, setLoading] = useState(false)
+const PRE_LABELS = { pending: 'Pending', processing: 'Processing', completed: 'Completed', cancelled: 'Cancelled' };
+
+function PreVerifiedTab({ theme }) {
+  const [store] = useStore();
+  const orders = store.orders || [];
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [savingId, setSavingId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const refetch = useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const data = await apiGet('orders', { order: 'created_at', ascending: 'false' })
-      if (Array.isArray(data) && data.length > 0)
-        globalSetStore(s => ({ ...s, orders: data }))
-    } finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { refetch() }, [refetch])
+      const data = await apiGet('purchases', { order: 'created_at', ascending: 'false' });
+      if (Array.isArray(data) && data.length > 0) globalSetStore(s => ({ ...s, orders: data }));
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { refetch(); }, [refetch]);
 
   const filtered = orders.filter(o => {
-    if (filter !== 'all' && o.status !== filter) return false
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (o.id || '').toLowerCase().includes(q) ||
-      (o.user_email || o.user || '').toLowerCase().includes(q) ||
-      (o.platform || '').toLowerCase().includes(q)
-  })
+    if (filter !== 'all' && o.status !== filter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (o.id || '').toLowerCase().includes(q) || (o.user_email || o.user || '').toLowerCase().includes(q) || (o.platform || '').toLowerCase().includes(q);
+  });
 
   const updateStatus = async (id, status) => {
-    setSavingId(id)
+    setSavingId(id);
     try {
-      await apiPut('orders', { id, status })
-      globalSetStore(s => ({ ...s, orders: s.orders.map(o => o.id === id ? { ...o, status } : o) }))
-    } catch (e) { alert(e.message) } finally { setSavingId(null) }
-  }
+      await apiPut('purchases', { id, status });
+      globalSetStore(s => ({ ...s, orders: s.orders.map(o => o.id === id ? { ...o, status } : o) }));
+    } catch (e) { alert(e.message); } finally { setSavingId(null); }
+  };
 
   return (
     <div>
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          ['Total', orders.length, '#3b82f6'],
-          ['Completed', orders.filter(o => o.status === 'completed').length, '#10b981'],
-          ['Processing', orders.filter(o => o.status === 'processing').length, '#f59e0b'],
-          ['Pending', orders.filter(o => o.status === 'pending').length, '#ef4444'],
-        ].map(([l, v, c]) => (
-          <div key={l} style={{ background: TC.card, border: `1px solid ${TC.g200}`, borderRadius: 12, padding: '14px 18px' }}>
-            <div style={{ fontSize: 11, color: TC.g400, marginBottom: 4 }}>{l}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: c }}>{v}</div>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 22 }}>
+        <StatCard theme={theme} label="Total" value={orders.length} tint="#3b82f6" />
+        <StatCard theme={theme} label="Completed" value={orders.filter(o => o.status === 'completed').length} tint="#22c55e" />
+        <StatCard theme={theme} label="Processing" value={orders.filter(o => o.status === 'processing').length} tint="#f59e0b" />
+        <StatCard theme={theme} label="Pending" value={orders.filter(o => o.status === 'pending').length} tint="#ef4444" />
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-        <SectionSearch value={search} onChange={setSearch} placeholder="Search by ID, user, platform…" />
-        <div style={{ display: 'flex', gap: 6 }}>
-          {['all', 'pending', 'processing', 'completed', 'cancelled'].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{
-              padding: '6px 12px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              border: `1px solid ${filter === s ? '#E8192C' : TC.g300}`,
-              background: filter === s ? '#fef2f3' : TC.g100,
-              color: filter === s ? '#E8192C' : TC.g600,
-              textTransform: 'capitalize',
-            }}>{s}</button>
-          ))}
+      <SearchFilterBar theme={theme} search={search} setSearch={setSearch} placeholder="Search by ID, user, platform…"
+        filters={[['all', 'All'], ['pending', 'Pending'], ['processing', 'Processing'], ['completed', 'Completed'], ['cancelled', 'Cancelled']].map(([value, label]) => ({ value, label }))}
+        filterValue={filter} setFilterValue={setFilter} onRefresh={refetch} loading={loading} />
+
+      <GlassCard theme={theme} style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT }}>
+            <thead>
+              <tr>
+                {['Order ID', 'User', 'Platform', 'Amount', 'Status', 'Actions'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '13px 20px', fontSize: 10.5, fontWeight: 700, color: theme.textFaint, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${theme.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: theme.textFaint, fontSize: 13 }}>Loading orders…</td></tr>}
+              {!loading && filtered.map((o, i, arr) => {
+                const last = i === arr.length - 1;
+                const cellStyle = { padding: '14px 20px', borderBottom: last ? 'none' : `1px solid ${theme.border}`, whiteSpace: 'nowrap', fontSize: 13, color: theme.text };
+                return (
+                  <tr key={o.id}>
+                    <td style={{ ...cellStyle, fontFamily: 'monospace', fontWeight: 700, fontSize: 12 }}>{o.id}<div style={{ fontWeight: 400, color: theme.textFaint, fontSize: 11, marginTop: 2 }}>{o.date}</div></td>
+                    <td style={cellStyle}>{o.user_email || o.user || '—'}</td>
+                    <td style={cellStyle}>{o.platform || '—'}</td>
+                    <td style={{ ...cellStyle, fontWeight: 800, color: BRAND }}>${o.amount || 0}</td>
+                    <td style={cellStyle}><StatusBadge status={o.status || 'pending'} labelMap={PRE_LABELS} /></td>
+                    <td style={cellStyle}>
+                      <ThemedSelect theme={theme} value={o.status || 'pending'} disabled={savingId === o.id} onChange={(v) => updateStatus(o.id, v)}
+                        options={[{ value: 'pending', label: 'Pending' }, { value: 'processing', label: 'Processing' }, { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' }]} />
+                    </td>
+                  </tr>
+                );
+              })}
+              {!loading && filtered.length === 0 && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: theme.textFaint, fontSize: 13 }}>No orders found</td></tr>}
+            </tbody>
+          </table>
         </div>
-        <button onClick={refetch} disabled={loading} style={{
-          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
-          padding: '6px 12px', borderRadius: 7, border: `1px solid ${TC.g300}`,
-          background: TC.g100, color: TC.g600, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-        }}>
-          {loading ? <Loader size={12} /> : <RefreshCw size={12} />} Refresh
-        </button>
-      </div>
-
-      {/* Table */}
-      <div style={{ background: TC.card, border: `1px solid ${TC.g200}`, borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '140px 1.5fr 100px 100px 110px 160px',
-          padding: '12px 20px', background: isDark ? 'rgba(255,255,255,.03)' : TC.g50,
-          borderBottom: `1px solid ${TC.g200}`,
-        }}>
-          {['Order ID', 'User', 'Platform', 'Amount', 'Status', 'Actions'].map(h => (
-            <div key={h} style={{ fontSize: 10, fontWeight: 800, color: TC.g400, textTransform: 'uppercase', letterSpacing: 0.6 }}>{h}</div>
-          ))}
-        </div>
-
-        {loading && <div style={{ padding: '32px', textAlign: 'center', color: TC.g400, fontSize: 13 }}>Loading orders…</div>}
-        {!loading && filtered.length === 0 && <EmptyState icon="📦" title="No orders found" subtitle="Orders will appear here once users make purchases." />}
-
-        {filtered.map((o, i) => (
-          <div key={o.id} className="reveal-item" style={{
-            display: 'grid', gridTemplateColumns: '140px 1.5fr 100px 100px 110px 160px',
-            padding: '13px 20px', alignItems: 'center',
-            borderBottom: i < filtered.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,.04)' : TC.g100}` : 'none',
-            animationDelay: `${i * 45}ms`,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: TC.text, fontFamily: 'monospace' }}>{o.id}</div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: TC.text }}>{o.user_email || o.user || '—'}</div>
-              <div style={{ fontSize: 11, color: TC.g400 }}>{o.date || ''}</div>
-            </div>
-            <div style={{ fontSize: 12, color: TC.g600 }}>{o.platform || '—'}</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#E8192C' }}>${o.amount || 0}</div>
-            <StatusPill status={o.status || 'pending'} map={PRE_STATUS} />
-            <select
-              value={o.status || 'pending'}
-              disabled={savingId === o.id}
-              onChange={e => updateStatus(o.id, e.target.value)}
-              style={{
-                fontSize: 11, borderRadius: 6, border: `1px solid ${TC.g300}`,
-                padding: '5px 8px', background: TC.card, color: TC.text,
-                fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
-              }}
-            >
-              <option value="pending">Pending</option>
-              <option value="processing">Processing</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        ))}
-      </div>
+      </GlassCard>
     </div>
-  )
+  );
 }
 
-/* ═══════════════════════════════════════════════════
-   TAB 2 — AGENCY AD ACCOUNTS
-═══════════════════════════════════════════════════ */
-const AGENCY_STATUS = {
-  pending:   { bg: '#fef3c7', text: '#92400e', label: 'Pending' },
-  in_review: { bg: '#dbeafe', text: '#1e40af', label: 'In Review' },
-  approved:  { bg: '#d1fae5', text: '#065f46', label: 'Approved' },
-  rejected:  { bg: '#fee2e2', text: '#991b1b', label: 'Rejected' },
-}
+const AGY_LABELS = { pending: 'Pending', in_review: 'In Review', approved: 'Approved', rejected: 'Rejected' };
 
-function AgencyTab({ TC, isDark }) {
-  const [store] = useStore()
-  const requests = store.adAccountRequests || []
-  const users = store.users || []
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [savingId, setSavingId] = useState(null)
-  const [detail, setDetail] = useState(null)
+function AgencyTab({ theme }) {
+  const [store] = useStore();
+  const requests = store.adAccountRequests || [];
+  const users = store.users || [];
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [savingId, setSavingId] = useState(null);
+  const [detail, setDetail] = useState(null);
 
   const getUserEmail = (userId) => {
-    const u = users.find(u => u.id === userId)
-    return u ? (u.email || u.name) : (userId || '—')
-  }
+    const u = users.find(u => u.id === userId);
+    return u ? (u.email || u.name) : (userId || '—');
+  };
 
   const filtered = requests.filter(r => {
-    if (filter !== 'all' && r.status !== filter) return false
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (r.account_name || r.accountName || '').toLowerCase().includes(q) ||
-      (r.platform || '').toLowerCase().includes(q) ||
-      getUserEmail(r.user_id).toLowerCase().includes(q)
-  })
+    if (filter !== 'all' && r.status !== filter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (r.account_name || '').toLowerCase().includes(q) || (r.platform || '').toLowerCase().includes(q) || getUserEmail(r.user_id).toLowerCase().includes(q);
+  });
 
   const updateStatus = async (id, status) => {
-    setSavingId(id)
+    setSavingId(id);
     try {
-      await apiPut('ad_account_requests', { id, status })
-      globalSetStore(s => ({
-        ...s,
-        adAccountRequests: s.adAccountRequests.map(r => r.id === id ? { ...r, status } : r)
-      }))
-    } catch (e) { alert(e.message) } finally { setSavingId(null) }
-  }
+      await apiPut('ad_account_requests', { id, status });
+      globalSetStore(s => ({ ...s, adAccountRequests: s.adAccountRequests.map(r => r.id === id ? { ...r, status } : r) }));
+    } catch (e) { alert(e.message); } finally { setSavingId(null); }
+  };
 
   return (
     <div>
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          ['Total Requests', requests.length, '#3b82f6'],
-          ['Pending', requests.filter(r => r.status === 'pending').length, '#f59e0b'],
-          ['In Review', requests.filter(r => r.status === 'in_review').length, '#8b5cf6'],
-          ['Approved', requests.filter(r => r.status === 'approved').length, '#10b981'],
-        ].map(([l, v, c]) => (
-          <div key={l} style={{ background: TC.card, border: `1px solid ${TC.g200}`, borderRadius: 12, padding: '14px 18px' }}>
-            <div style={{ fontSize: 11, color: TC.g400, marginBottom: 4 }}>{l}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: c }}>{v}</div>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 22 }}>
+        <StatCard theme={theme} label="Total Requests" value={requests.length} tint="#3b82f6" />
+        <StatCard theme={theme} label="Pending" value={requests.filter(r => r.status === 'pending').length} tint="#f59e0b" />
+        <StatCard theme={theme} label="In Review" value={requests.filter(r => r.status === 'in_review').length} tint="#a855f7" />
+        <StatCard theme={theme} label="Approved" value={requests.filter(r => r.status === 'approved').length} tint="#22c55e" />
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-        <SectionSearch value={search} onChange={setSearch} placeholder="Search by account, platform, user…" />
-        <div style={{ display: 'flex', gap: 6 }}>
-          {['all', 'pending', 'in_review', 'approved', 'rejected'].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{
-              padding: '6px 12px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              border: `1px solid ${filter === s ? '#E8192C' : TC.g300}`,
-              background: filter === s ? '#fef2f3' : TC.g100,
-              color: filter === s ? '#E8192C' : TC.g600,
-              textTransform: 'capitalize',
-            }}>{s === 'in_review' ? 'In Review' : s}</button>
-          ))}
+      <SearchFilterBar theme={theme} search={search} setSearch={setSearch} placeholder="Search by account, platform, user…"
+        filters={[['all', 'All'], ['pending', 'Pending'], ['in_review', 'In Review'], ['approved', 'Approved'], ['rejected', 'Rejected']].map(([value, label]) => ({ value, label }))}
+        filterValue={filter} setFilterValue={setFilter} />
+
+      <GlassCard theme={theme} style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT }}>
+            <thead>
+              <tr>
+                {['Account Name', 'User', 'Platform', 'Business Type', 'Status', 'Actions'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '13px 20px', fontSize: 10.5, fontWeight: 700, color: theme.textFaint, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${theme.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r, i, arr) => {
+                const last = i === arr.length - 1;
+                const cellStyle = { padding: '14px 20px', borderBottom: last ? 'none' : `1px solid ${theme.border}`, whiteSpace: 'nowrap', fontSize: 13, color: theme.text };
+                return (
+                  <tr key={r.id}>
+                    <td style={cellStyle}>
+                      <div style={{ fontWeight: 700 }}>{r.account_name || '—'}</div>
+                      <div style={{ fontSize: 11.5, color: theme.textFaint, marginTop: 2 }}>{r.id}</div>
+                    </td>
+                    <td style={cellStyle}>{getUserEmail(r.user_id)}</td>
+                    <td style={cellStyle}>{r.platform || '—'}</td>
+                    <td style={cellStyle}>{r.business_type || '—'}</td>
+                    <td style={cellStyle}><StatusBadge status={r.status || 'pending'} labelMap={AGY_LABELS} /></td>
+                    <td style={cellStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <ThemedSelect theme={theme} value={r.status || 'pending'} disabled={savingId === r.id} onChange={(v) => updateStatus(r.id, v)}
+                          options={[{ value: 'pending', label: 'Pending' }, { value: 'in_review', label: 'In Review' }, { value: 'approved', label: 'Approved' }, { value: 'rejected', label: 'Rejected' }]} />
+                        <button onClick={() => setDetail(r)} style={{ height: 34, padding: '0 14px', borderRadius: 9, border: `1px solid ${theme.border}`, background: theme.surfaceSunken, color: theme.text, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Eye size={12} /> View
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && <tr><td colSpan={6} style={{ padding: 30, textAlign: 'center', color: theme.textFaint, fontSize: 13 }}>No agency account requests</td></tr>}
+            </tbody>
+          </table>
         </div>
-      </div>
+      </GlassCard>
 
-      {/* Table */}
-      <div style={{ background: TC.card, border: `1px solid ${TC.g200}`, borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1.4fr 1.2fr 110px 120px 110px 180px',
-          padding: '12px 20px', background: isDark ? 'rgba(255,255,255,.03)' : TC.g50,
-          borderBottom: `1px solid ${TC.g200}`,
-        }}>
-          {['Account Name', 'User', 'Platform', 'Business Type', 'Status', 'Actions'].map(h => (
-            <div key={h} style={{ fontSize: 10, fontWeight: 800, color: TC.g400, textTransform: 'uppercase', letterSpacing: 0.6 }}>{h}</div>
-          ))}
-        </div>
-
-        {filtered.length === 0 && <EmptyState icon="◧" title="No agency account requests" subtitle="Requests will appear here once users submit them." />}
-
-        {filtered.map((r, i) => (
-          <div key={r.id} className="reveal-item" style={{
-            display: 'grid', gridTemplateColumns: '1.4fr 1.2fr 110px 120px 110px 180px',
-            padding: '13px 20px', alignItems: 'center',
-            borderBottom: i < filtered.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,.04)' : TC.g100}` : 'none',
-            animationDelay: `${i * 45}ms`,
-          }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: TC.text }}>{r.account_name || r.accountName || '—'}</div>
-              <div style={{ fontSize: 11, color: TC.g400 }}>{r.requestId || r.id}</div>
-            </div>
-            <div style={{ fontSize: 12, color: TC.g500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {getUserEmail(r.user_id)}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: TC.g700 }}>{r.platform || '—'}</div>
-            <div style={{ fontSize: 11, color: TC.g500 }}>{r.business_type || r.businessType || '—'}</div>
-            <StatusPill status={r.status || 'pending'} map={AGENCY_STATUS} />
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <select
-                value={r.status || 'pending'}
-                disabled={savingId === r.id}
-                onChange={e => updateStatus(r.id, e.target.value)}
-                style={{
-                  fontSize: 11, borderRadius: 6, border: `1px solid ${TC.g300}`,
-                  padding: '5px 8px', background: TC.card, color: TC.text,
-                  fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
-                }}
-              >
-                <option value="pending">Pending</option>
-                <option value="in_review">In Review</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <button
-                onClick={() => setDetail(r)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '5px 10px', borderRadius: 6,
-                  border: `1px solid ${TC.g300}`, background: TC.g100,
-                  color: TC.g600, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                }}
-              >
-                <Eye size={11} /> View
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Detail modal */}
       {detail && (
-        <div onClick={() => setDetail(null)} style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
-          backdropFilter: 'blur(4px)', zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            background: TC.card, borderRadius: 16, border: `1px solid ${TC.g200}`,
-            boxShadow: '0 24px 64px rgba(0,0,0,.25)',
-            width: 520, maxWidth: '92vw', maxHeight: '85vh',
-            overflow: 'auto', padding: 28,
-          }}>
+        <div onClick={() => setDetail(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: theme.surface, borderRadius: 20, border: `1px solid ${theme.border}`, boxShadow: theme.shadowLg, width: 520, maxWidth: '92vw', maxHeight: '85vh', overflow: 'auto', padding: 24, fontFamily: FONT }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: TC.text }}>Request Details</div>
-              <button onClick={() => setDetail(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: TC.g400 }}>✕</button>
+              <div style={{ fontSize: 16, fontWeight: 800, color: theme.text }}>Request Details</div>
+              <button onClick={() => setDetail(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: theme.textFaint }}>✕</button>
             </div>
             {[
-              ['Account Name', detail.account_name || detail.accountName],
+              ['Account Name', detail.account_name],
               ['Platform', detail.platform],
-              ['Business Name', detail.business_name || detail.businessName],
-              ['Business Type', detail.business_type || detail.businessType],
-              ['Email', detail.business_email || detail.email],
-              ['BM ID', detail.bm_id || detail.bmId],
-              ['Page Links', detail.page_links || detail.pageLinks],
+              ['Business Name', detail.business_name],
+              ['Business Type', detail.business_type],
+              ['Email', detail.business_email],
+              ['BM ID', detail.bm_id],
               ['Status', detail.status],
-              ['Submitted', detail.submitted_at ? new Date(detail.submitted_at).toLocaleString() : '—'],
+              ['Submitted', detail.created_at ? new Date(detail.created_at).toLocaleString() : '—'],
             ].map(([k, v]) => v ? (
               <div key={k} style={{ display: 'flex', gap: 12, marginBottom: 12, fontSize: 13 }}>
-                <span style={{ fontWeight: 700, color: TC.g500, minWidth: 120 }}>{k}</span>
-                <span style={{ color: TC.text, wordBreak: 'break-all' }}>{v}</span>
+                <span style={{ fontWeight: 700, color: theme.textMuted, minWidth: 120 }}>{k}</span>
+                <span style={{ color: theme.text, wordBreak: 'break-all' }}>{v}</span>
               </div>
             ) : null)}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
-/* ═══════════════════════════════════════════════════
-   TAB 3 — STRUCTURE BUILDING ORDERS
-═══════════════════════════════════════════════════ */
-const STRUCT_STATUS = {
-  pending:        { bg: '#fef3c7', text: '#92400e', label: 'Pending' },
-  building:       { bg: '#dbeafe', text: '#1e40af', label: 'Building' },
-  done:           { bg: '#d1fae5', text: '#065f46', label: 'Done' },
-  rejected:       { bg: '#fee2e2', text: '#991b1b', label: 'Rejected' },
-  assets_missing: { bg: '#fce7f3', text: '#be185d', label: 'Assets Missing' },
-}
+const STR_LABELS = { pending: 'Pending', building: 'Building', done: 'Done', rejected: 'Rejected', assets_missing: 'Assets Missing' };
 
-function StructureTab({ TC, isDark }) {
-  const [orders, setOrders] = useState([])
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [loading, setLoading] = useState(false)
-  const [savingId, setSavingId] = useState(null)
-  const [previewOrder, setPreviewOrder] = useState(null)
-  const [error, setError] = useState('')
-  const [draftNotes, setDraftNotes] = useState({})
-  const [savedNotes, setSavedNotes] = useState({})
-  const [draftDelivery, setDraftDelivery] = useState({})
-  const [savedDelivery, setSavedDelivery] = useState({})
+function StructureTab({ theme }) {
+  const [orders, setOrders] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [savingId, setSavingId] = useState(null);
+  const [previewOrder, setPreviewOrder] = useState(null);
+  const [error, setError] = useState('');
+  const [draftNotes, setDraftNotes] = useState({});
+  const [savedNotes, setSavedNotes] = useState({});
+  const [draftDelivery, setDraftDelivery] = useState({});
+  const [savedDelivery, setSavedDelivery] = useState({});
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('');
     try {
-      const res = await fetchStructureOrders(false)
+      const res = await fetchStructureOrders(false);
       if (res?.orders) {
-        setOrders(res.orders)
-        // seed draftNotes from existing admin_notes
-        const seeds = {}
-        const deliverySeeds = {}
+        setOrders(res.orders);
+        const seeds = {}, deliverySeeds = {};
         for (const o of res.orders) {
-          if (o.admin_notes) seeds[o.id] = o.admin_notes
-          if (o.delivery_info) deliverySeeds[o.id] = o.delivery_info
+          if (o.admin_notes) seeds[o.id] = o.admin_notes;
+          if (o.delivery_info) deliverySeeds[o.id] = o.delivery_info;
         }
-        setDraftNotes(prev => ({ ...seeds, ...prev }))
-        setDraftDelivery(prev => ({ ...deliverySeeds, ...prev }))
+        setDraftNotes(prev => ({ ...seeds, ...prev }));
+        setDraftDelivery(prev => ({ ...deliverySeeds, ...prev }));
       }
     } catch (e) {
-      setError('Failed to load: ' + e.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { load() }, [load])
+      setError('Failed to load: ' + e.message);
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const changeStatus = async (id, status) => {
-    setSavingId(id)
+    setSavingId(id);
     try {
-      await updateStructureOrder(id, { status })
-      setOrders(prev => prev.map(o => String(o.id) === String(id) ? { ...o, status } : o))
+      await updateStructureOrder(id, { status });
+      setOrders(prev => prev.map(o => String(o.id) === String(id) ? { ...o, status } : o));
       if (status === 'assets_missing') {
-        const order = orders.find(o => String(o.id) === String(id))
-        setDraftNotes(prev => ({
-          ...prev,
-          [id]: prev[id] !== undefined ? prev[id] : (order?.admin_notes || ''),
-        }))
+        const order = orders.find(o => String(o.id) === String(id));
+        setDraftNotes(prev => ({ ...prev, [id]: prev[id] !== undefined ? prev[id] : (order?.admin_notes || '') }));
       }
       if (status === 'done') {
-        const order = orders.find(o => String(o.id) === String(id))
-        setDraftDelivery(prev => ({
-          ...prev,
-          [id]: prev[id] !== undefined ? prev[id] : (order?.delivery_info || ''),
-        }))
+        const order = orders.find(o => String(o.id) === String(id));
+        setDraftDelivery(prev => ({ ...prev, [id]: prev[id] !== undefined ? prev[id] : (order?.delivery_info || '') }));
       }
-    } catch (e) { alert(e.message) } finally { setSavingId(null) }
-  }
+    } catch (e) { alert(e.message); } finally { setSavingId(null); }
+  };
 
   const saveDelivery = async (id) => {
-    const text = draftDelivery[id] || ''
+    const text = draftDelivery[id] || '';
     try {
-      await updateStructureOrder(id, { delivery_info: text })
-      setOrders(prev => prev.map(o => String(o.id) === String(id) ? { ...o, delivery_info: text } : o))
-      setSavedDelivery(prev => ({ ...prev, [id]: true }))
-      setTimeout(() => setSavedDelivery(prev => ({ ...prev, [id]: false })), 2500)
-    } catch (e) { alert('Failed to save delivery info: ' + e.message) }
-  }
+      await updateStructureOrder(id, { delivery_info: text });
+      setOrders(prev => prev.map(o => String(o.id) === String(id) ? { ...o, delivery_info: text } : o));
+      setSavedDelivery(prev => ({ ...prev, [id]: true }));
+      setTimeout(() => setSavedDelivery(prev => ({ ...prev, [id]: false })), 2500);
+    } catch (e) { alert('Failed to save delivery info: ' + e.message); }
+  };
 
   const saveNote = async (id) => {
-    const text = draftNotes[id] || ''
+    const text = draftNotes[id] || '';
     try {
-      await updateStructureOrder(id, { admin_notes: text })
-      setOrders(prev => prev.map(o => String(o.id) === String(id) ? { ...o, admin_notes: text } : o))
-      setSavedNotes(prev => ({ ...prev, [id]: true }))
-      setTimeout(() => setSavedNotes(prev => ({ ...prev, [id]: false })), 2500)
-    } catch (e) { alert('Failed to save note: ' + e.message) }
-  }
+      await updateStructureOrder(id, { admin_notes: text });
+      setOrders(prev => prev.map(o => String(o.id) === String(id) ? { ...o, admin_notes: text } : o));
+      setSavedNotes(prev => ({ ...prev, [id]: true }));
+      setTimeout(() => setSavedNotes(prev => ({ ...prev, [id]: false })), 2500);
+    } catch (e) { alert('Failed to save note: ' + e.message); }
+  };
 
   const filtered = orders.filter(o => {
-    if (filter !== 'all' && o.status !== filter) return false
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (o.order_code || '').toLowerCase().includes(q) ||
-      (o.user_name || '').toLowerCase().includes(q) ||
-      (o.user_email || '').toLowerCase().includes(q) ||
-      (o.name || '').toLowerCase().includes(q)
-  })
+    if (filter !== 'all' && o.status !== filter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (o.order_code || '').toLowerCase().includes(q) || (o.user_name || '').toLowerCase().includes(q) || (o.user_email || '').toLowerCase().includes(q) || (o.name || '').toLowerCase().includes(q);
+  });
 
   return (
     <div>
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          ['Total', orders.length, '#3b82f6'],
-          ['Pending', orders.filter(o => o.status === 'pending').length, '#f59e0b'],
-          ['Building', orders.filter(o => o.status === 'building').length, '#3b82f6'],
-          ['Done', orders.filter(o => o.status === 'done').length, '#10b981'],
-          ['Rejected', orders.filter(o => o.status === 'rejected' || o.status === 'assets_missing').length, '#ef4444'],
-        ].map(([l, v, c]) => (
-          <div key={l} style={{ background: TC.card, border: `1px solid ${TC.g200}`, borderRadius: 12, padding: '14px 18px' }}>
-            <div style={{ fontSize: 11, color: TC.g400, marginBottom: 4 }}>{l}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: c }}>{v}</div>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 22 }}>
+        <StatCard theme={theme} label="Total" value={orders.length} tint="#3b82f6" />
+        <StatCard theme={theme} label="Pending" value={orders.filter(o => o.status === 'pending').length} tint="#f59e0b" />
+        <StatCard theme={theme} label="Building" value={orders.filter(o => o.status === 'building').length} tint="#3b82f6" />
+        <StatCard theme={theme} label="Done" value={orders.filter(o => o.status === 'done').length} tint="#22c55e" />
+        <StatCard theme={theme} label="Rejected" value={orders.filter(o => o.status === 'rejected' || o.status === 'assets_missing').length} tint="#ef4444" />
       </div>
 
-      {error && (
-        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', padding: '12px 16px', borderRadius: 10, marginBottom: 14, fontSize: 13 }}>
-          {error}
-        </div>
-      )}
+      {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '12px 16px', borderRadius: 12, marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-        <SectionSearch value={search} onChange={setSearch} placeholder="Search by code, customer, structure name…" />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {['all', 'pending', 'building', 'done', 'rejected', 'assets_missing'].map(s => (
-            <button key={s} onClick={() => setFilter(s)} style={{
-              padding: '6px 12px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              border: `1px solid ${filter === s ? '#E8192C' : TC.g300}`,
-              background: filter === s ? '#fef2f3' : TC.g100,
-              color: filter === s ? '#E8192C' : TC.g600,
-            }}>
-              {s === 'assets_missing' ? 'Assets Missing' : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-        </div>
-        <button onClick={load} disabled={loading} style={{
-          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
-          padding: '6px 12px', borderRadius: 7, border: `1px solid ${TC.g300}`,
-          background: TC.g100, color: TC.g600, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-        }}>
-          {loading ? <Loader size={12} /> : <RefreshCw size={12} />} Refresh
-        </button>
-      </div>
+      <SearchFilterBar theme={theme} search={search} setSearch={setSearch} placeholder="Search by code, customer, structure name…"
+        filters={[['all', 'All'], ['pending', 'Pending'], ['building', 'Building'], ['done', 'Done'], ['rejected', 'Rejected'], ['assets_missing', 'Assets Missing']].map(([value, label]) => ({ value, label }))}
+        filterValue={filter} setFilterValue={setFilter} onRefresh={load} loading={loading} />
 
-      {/* Table */}
-      <div style={{ background: TC.card, border: `1px solid ${TC.g200}`, borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '140px 1.4fr 1.2fr 100px 90px 150px 100px',
-          padding: '12px 20px', background: isDark ? 'rgba(255,255,255,.03)' : TC.g50,
-          borderBottom: `1px solid ${TC.g200}`,
-        }}>
-          {['Order Code', 'Customer', 'Structure', 'Assets', 'Price', 'Status', 'Actions'].map(h => (
-            <div key={h} style={{ fontSize: 10, fontWeight: 800, color: TC.g400, textTransform: 'uppercase', letterSpacing: 0.6 }}>{h}</div>
-          ))}
-        </div>
-
-        {loading && (
-          <div style={{ padding: '40px', textAlign: 'center', color: TC.g400, fontSize: 13 }}>
-            <Loader size={22} style={{ marginBottom: 10, display: 'block', margin: '0 auto 10px' }} />
-            Loading structure orders…
-          </div>
-        )}
-        {!loading && filtered.length === 0 && (
-          <EmptyState icon="📐" title="No structure orders yet" subtitle="Orders will appear here once users submit from the builder." />
-        )}
-
-        {filtered.map((o, i) => {
-          const isLast = i === filtered.length - 1
-          const isMissing = o.status === 'assets_missing'
-          const isDone = o.status === 'done'
-          const noteSaved = savedNotes[o.id]
-          const noteText = draftNotes[o.id] !== undefined ? draftNotes[o.id] : (o.admin_notes || '')
-          const deliveryText = draftDelivery[o.id] !== undefined ? draftDelivery[o.id] : (o.delivery_info || '')
-          const deliverySaved = savedDelivery[o.id]
-
-          return (
-            <div key={o.id} style={{ borderBottom: isLast ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,.04)' : TC.g100}` }}>
-              {/* Main row */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: '140px 1.4fr 1.2fr 100px 90px 150px 100px',
-                padding: '14px 20px', alignItems: 'center',
-              }}>
-                {/* Order code */}
-                <div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: TC.text }}>{o.order_code}</div>
-                  <div style={{ fontSize: 10, color: TC.g400, marginTop: 2 }}>
-                    {o.submitted_at ? new Date(o.submitted_at).toLocaleDateString() : '—'}
-                  </div>
-                </div>
-                {/* Customer */}
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: TC.text }}>{o.user_name || 'Unknown'}</div>
-                  <div style={{ fontSize: 11, color: TC.g400 }}>{o.user_email || ''}</div>
-                </div>
-                {/* Structure name */}
-                <div style={{ fontSize: 12, fontWeight: 600, color: TC.g700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-                  {o.name || 'Untitled'}
-                </div>
-                {/* Assets count */}
-                <div style={{ fontSize: 11, color: TC.g500 }}>
-                  {o.node_count || 0} nodes<br />
-                  {o.edge_count || 0} edges
-                </div>
-                {/* Price */}
-                <div style={{ fontSize: 14, fontWeight: 900, color: '#E8192C' }}>
-                  ${Number(o.total_price || 0).toFixed(2)}
-                </div>
-                {/* Status dropdown */}
-                <select
-                  value={o.status || 'pending'}
-                  disabled={savingId === o.id}
-                  onChange={e => changeStatus(o.id, e.target.value)}
-                  style={{
-                    padding: '6px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                    border: `1px solid ${STRUCT_STATUS[o.status]?.text || TC.g300}30`,
-                    background: STRUCT_STATUS[o.status]?.bg || TC.g100,
-                    color: STRUCT_STATUS[o.status]?.text || TC.g600,
-                    fontFamily: 'inherit', cursor: 'pointer', outline: 'none',
-                  }}
-                >
-                  <option value="pending">Pending</option>
-                  <option value="building">Building</option>
-                  <option value="done">Done</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="assets_missing">Assets Missing</option>
-                </select>
-                {/* View button */}
-                <button
-                  onClick={() => setPreviewOrder(o)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '7px 12px', borderRadius: 8,
-                    border: `1px solid ${TC.g300}`, background: TC.g100,
-                    color: TC.g700, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  }}
-                >
-                  <Eye size={12} /> View
-                </button>
-              </div>
-
-              {/* ── Done — delivery info panel ── */}
-              {isDone && (
-                <div style={{
-                  margin: '0 20px 16px',
-                  background: isDark ? 'rgba(209,250,229,.04)' : '#f0fdf4',
-                  border: '1px solid #86efac',
-                  borderRadius: 10,
-                  padding: '14px 16px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                    <CheckCircle size={14} color="#16a34a" />
-                    <span style={{ fontSize: 12, fontWeight: 800, color: '#15803d' }}>
-                      Delivery Info — visible to the client when they check their order
-                    </span>
-                  </div>
-                  <textarea
-                    value={deliveryText}
-                    onChange={e => setDraftDelivery(prev => ({ ...prev, [o.id]: e.target.value }))}
-                    placeholder={'Paste links, credentials, or instructions for the client.\n\nExample:\nBM Invite: https://business.facebook.com/...\nNote: Accept the invite within 48h.'}
-                    rows={4}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      padding: '10px 12px', borderRadius: 8,
-                      border: '1px solid #86efac',
-                      background: isDark ? 'rgba(255,255,255,.06)' : '#fff',
-                      color: TC.text, fontSize: 12, fontFamily: 'inherit',
-                      resize: 'vertical', outline: 'none', lineHeight: 1.6,
-                    }}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                    {deliverySaved ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#15803d', fontWeight: 700 }}>
-                        <CheckCheck size={13} /> Saved — client can now view this
-                      </span>
-                    ) : o.delivery_info ? (
-                      <span style={{ fontSize: 11, color: TC.g400 }}>
-                        Saved: {o.delivery_info.slice(0, 60)}{o.delivery_info.length > 60 ? '…' : ''}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 11, color: TC.g400 }}>No delivery info saved yet</span>
+      <GlassCard theme={theme} style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT }}>
+            <thead>
+              <tr>
+                {['Order Code', 'Customer', 'Structure', 'Assets', 'Price', 'Status', 'Actions'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '13px 20px', fontSize: 10.5, fontWeight: 700, color: theme.textFaint, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${theme.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: theme.textFaint, fontSize: 13 }}>Loading structure orders…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: theme.textFaint, fontSize: 13 }}>No structure orders yet</td></tr>}
+              {!loading && filtered.map((o, i, arr) => {
+                const last = i === arr.length - 1;
+                const isMissing = o.status === 'assets_missing';
+                const isDone = o.status === 'done';
+                const noteSaved = savedNotes[o.id];
+                const noteText = draftNotes[o.id] !== undefined ? draftNotes[o.id] : (o.admin_notes || '');
+                const deliveryText = draftDelivery[o.id] !== undefined ? draftDelivery[o.id] : (o.delivery_info || '');
+                const deliverySaved = savedDelivery[o.id];
+                const cellStyle = { padding: '14px 20px', whiteSpace: 'nowrap', fontSize: 13, color: theme.text, verticalAlign: 'top' };
+                return (
+                  <Fragment key={o.id}>
+                    <tr style={{ borderBottom: (last && !isDone && !isMissing) ? 'none' : `1px solid ${theme.border}` }}>
+                      <td style={cellStyle}>
+                        <div style={{ fontFamily: 'monospace', fontSize: 11.5, fontWeight: 700 }}>{o.order_code}</div>
+                        <div style={{ fontSize: 10.5, color: theme.textFaint, marginTop: 2 }}>{o.submitted_at ? new Date(o.submitted_at).toLocaleDateString() : '—'}</div>
+                      </td>
+                      <td style={cellStyle}>
+                        <div style={{ fontWeight: 700 }}>{o.user_name || 'Unknown'}</div>
+                        <div style={{ fontSize: 11, color: theme.textFaint }}>{o.user_email || ''}</div>
+                      </td>
+                      <td style={{ ...cellStyle, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.name || 'Untitled'}</td>
+                      <td style={{ ...cellStyle, fontSize: 11.5, color: theme.textMuted }}>{o.node_count || 0} nodes<br />{o.edge_count || 0} edges</td>
+                      <td style={{ ...cellStyle, fontWeight: 800, color: BRAND }}>${Number(o.total_price || 0).toFixed(2)}</td>
+                      <td style={cellStyle}>
+                        <ThemedSelect theme={theme} value={o.status || 'pending'} disabled={savingId === o.id} onChange={(v) => changeStatus(o.id, v)}
+                          options={[{ value: 'pending', label: 'Pending' }, { value: 'building', label: 'Building' }, { value: 'done', label: 'Done' }, { value: 'rejected', label: 'Rejected' }, { value: 'assets_missing', label: 'Assets Missing' }]} />
+                      </td>
+                      <td style={cellStyle}>
+                        <button onClick={() => setPreviewOrder(o)} style={{ height: 34, padding: '0 14px', borderRadius: 9, border: `1px solid ${theme.border}`, background: theme.surfaceSunken, color: theme.text, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Eye size={12} /> View
+                        </button>
+                      </td>
+                    </tr>
+                    {(isDone || isMissing) && (
+                      <tr style={{ borderBottom: last ? 'none' : `1px solid ${theme.border}` }}>
+                        <td colSpan={7} style={{ padding: '0 20px 18px' }}>
+                          {isDone && (
+                            <div style={{ borderRadius: 14, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.06)', padding: 16 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                <CheckCircle size={14} color="#22c55e" />
+                                <span style={{ fontSize: 12.5, fontWeight: 800, color: '#22c55e' }}>Delivery Info — visible to the client when they check their order</span>
+                              </div>
+                              <textarea
+                                value={deliveryText}
+                                onChange={e => setDraftDelivery(prev => ({ ...prev, [o.id]: e.target.value }))}
+                                placeholder={'Paste links, credentials, or instructions for the client.\n\nExample:\nBM Invite: https://business.facebook.com/...\nNote: Accept the invite within 48h.'}
+                                rows={4}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: 12, borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.surfaceSunken, color: theme.text, fontSize: 12.5, fontFamily: 'monospace', resize: 'vertical', outline: 'none', lineHeight: 1.6 }}
+                              />
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+                                {deliverySaved ? (
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#22c55e', fontWeight: 700 }}><CheckCheck size={13} /> Saved — client can now view this</span>
+                                ) : o.delivery_info ? (
+                                  <span style={{ fontSize: 11.5, color: theme.textFaint }}>Saved: {o.delivery_info.slice(0, 60)}{o.delivery_info.length > 60 ? '…' : ''}</span>
+                                ) : (
+                                  <span style={{ fontSize: 11.5, color: theme.textFaint }}>No delivery info saved yet</span>
+                                )}
+                                <button onClick={() => saveDelivery(o.id)} disabled={!deliveryText.trim()} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 100, border: 'none', background: deliveryText.trim() ? `linear-gradient(180deg,${BRAND_LIGHT},${BRAND})` : theme.surfaceSunken, color: deliveryText.trim() ? '#fff' : theme.textFaint, fontSize: 12, fontWeight: 700, cursor: deliveryText.trim() ? 'pointer' : 'not-allowed', fontFamily: FONT }}>
+                                  <Save size={12} /> Save & Send to Client
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {isMissing && (
+                            <div style={{ borderRadius: 14, border: '1px solid rgba(236,72,153,0.35)', background: 'rgba(236,72,153,0.06)', padding: 16 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                <AlertTriangle size={14} color="#ec4899" />
+                                <span style={{ fontSize: 12.5, fontWeight: 800, color: '#ec4899' }}>Missing Assets — describe what the user needs to provide</span>
+                              </div>
+                              <textarea
+                                value={noteText}
+                                onChange={e => setDraftNotes(prev => ({ ...prev, [o.id]: e.target.value }))}
+                                placeholder="e.g. Profile x3, BM Verified x1, Advertiser Account x2…"
+                                rows={3}
+                                style={{ width: '100%', boxSizing: 'border-box', padding: 12, borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.surfaceSunken, color: theme.text, fontSize: 12.5, fontFamily: FONT, resize: 'vertical', outline: 'none', lineHeight: 1.6 }}
+                              />
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+                                {noteSaved ? (
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#22c55e', fontWeight: 700 }}><CheckCheck size={13} /> Note saved — user will see this</span>
+                                ) : o.admin_notes ? (
+                                  <span style={{ fontSize: 11.5, color: theme.textFaint }}>Last saved: {o.admin_notes.slice(0, 60)}{o.admin_notes.length > 60 ? '…' : ''}</span>
+                                ) : <span />}
+                                <button onClick={() => saveNote(o.id)} disabled={!noteText.trim()} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 100, border: 'none', background: noteText.trim() ? '#ec4899' : theme.surfaceSunken, color: noteText.trim() ? '#fff' : theme.textFaint, fontSize: 12, fontWeight: 700, cursor: noteText.trim() ? 'pointer' : 'not-allowed', fontFamily: FONT }}>
+                                  <Save size={12} /> Save Note
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
                     )}
-                    <button
-                      onClick={() => saveDelivery(o.id)}
-                      disabled={!deliveryText.trim()}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '7px 16px', borderRadius: 8, border: 'none',
-                        background: deliveryText.trim() ? '#16a34a' : '#e5e7eb',
-                        color: deliveryText.trim() ? '#fff' : '#9ca3af',
-                        fontSize: 12, fontWeight: 700,
-                        cursor: deliveryText.trim() ? 'pointer' : 'not-allowed',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      <Save size={12} /> Save & Send to Client
-                    </button>
-                  </div>
-                </div>
-              )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
 
-              {/* ── Missing assets note panel (only when status = assets_missing) ── */}
-              {isMissing && (
-                <div style={{
-                  margin: '0 20px 16px',
-                  background: isDark ? 'rgba(252,231,243,.06)' : '#fdf2f8',
-                  border: '1px solid #f9a8d4',
-                  borderRadius: 10,
-                  padding: '14px 16px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                    <AlertTriangle size={14} color="#be185d" />
-                    <span style={{ fontSize: 12, fontWeight: 800, color: '#be185d' }}>
-                      Missing Assets — describe what the user needs to provide
-                    </span>
-                  </div>
-                  <textarea
-                    value={noteText}
-                    onChange={e => setDraftNotes(prev => ({ ...prev, [o.id]: e.target.value }))}
-                    placeholder="e.g. Profile x3, BM Verified x1, Advertiser Account x2…"
-                    rows={3}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      padding: '10px 12px', borderRadius: 8,
-                      border: '1px solid #f9a8d4',
-                      background: isDark ? 'rgba(255,255,255,.06)' : '#fff',
-                      color: TC.text, fontSize: 12, fontFamily: 'inherit',
-                      resize: 'vertical', outline: 'none', lineHeight: 1.6,
-                    }}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-                    {o.admin_notes && !noteSaved && (
-                      <span style={{ fontSize: 11, color: TC.g400 }}>
-                        Last saved: {o.admin_notes.slice(0, 60)}{o.admin_notes.length > 60 ? '…' : ''}
-                      </span>
-                    )}
-                    {noteSaved && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#065f46', fontWeight: 700 }}>
-                        <CheckCheck size={13} /> Note saved — user will see this
-                      </span>
-                    )}
-                    {!o.admin_notes && !noteSaved && <span />}
-                    <button
-                      onClick={() => saveNote(o.id)}
-                      disabled={!noteText.trim()}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '7px 16px', borderRadius: 8,
-                        border: 'none',
-                        background: noteText.trim() ? '#be185d' : '#e5e7eb',
-                        color: noteText.trim() ? '#fff' : '#9ca3af',
-                        fontSize: 12, fontWeight: 700, cursor: noteText.trim() ? 'pointer' : 'not-allowed',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      <Save size={12} /> Save Note
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      <StructurePreviewModal
-        isOpen={!!previewOrder}
-        onClose={() => setPreviewOrder(null)}
-        order={previewOrder}
-      />
+      <StructurePreviewModal isOpen={!!previewOrder} onClose={() => setPreviewOrder(null)} order={previewOrder} />
     </div>
-  )
+  );
 }
 
-/* ═══════════════════════════════════════════════════
-   MAIN PAGE
-═══════════════════════════════════════════════════ */
-const TABS = [
-  { key: 'preverified', label: 'Pre-Verified Accounts', icon: ShoppingBag },
-  { key: 'agency',      label: 'Agency Ad Accounts',    icon: Building2 },
-  { key: 'structure',   label: 'Structure Building',     icon: Layers },
-]
+function TabNav({ theme, tab, setTab, counts }) {
+  const tabs = [
+    { key: 'preverified', label: 'Pre-Verified Accounts', Icon: ShoppingBag },
+    { key: 'agency', label: 'Agency Ad Accounts', Icon: Building2 },
+    { key: 'structure', label: 'Structure Building', Icon: Layers },
+  ];
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 5, borderRadius: 14, background: theme.surfaceSunken, border: `1px solid ${theme.border}`, width: 'fit-content' }}>
+      {tabs.map(t => {
+        const active = t.key === tab;
+        const { Icon } = t;
+        return (
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 13, fontWeight: 700, background: active ? theme.surface : 'transparent', color: active ? theme.text : theme.textMuted, boxShadow: active ? theme.shadow : 'none', transition: 'all .15s' }}>
+            <Icon size={15} />{t.label}
+            {counts[t.key] > 0 && (
+              <span style={{ fontSize: 10.5, fontWeight: 800, color: active ? BRAND : theme.textFaint, background: active ? 'rgba(255,45,85,0.12)' : theme.surfaceSunken, borderRadius: 100, padding: '2px 8px' }}>{counts[t.key]}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AdminAllOrdersPage() {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
-  const TC = getThemeColors(isDark)
-  const [store] = useStore()
-  const [activeTab, setActiveTab] = useState('structure')
+  const { theme: themeMode } = useTheme();
+  const theme = getAdminTheme(themeMode === 'dark');
+  const [store] = useStore();
+  const [tab, setTab] = useState('structure');
 
   const counts = {
     preverified: (store.orders || []).length,
-    agency:      (store.adAccountRequests || []).length,
-    structure:   (store.structureOrders || []).length,
-  }
+    agency: (store.adAccountRequests || []).length,
+    structure: (store.structureOrders || []).length,
+  };
 
   return (
-    <div style={{ padding: '24px 28px', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", minHeight: '100%' }}>
-      {/* Page header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 900, color: TC.text, margin: 0 }}>Orders</h1>
-        <p style={{ fontSize: 13, color: TC.g500, margin: '4px 0 0' }}>
-          Manage all order types from one place
-        </p>
+    <div style={{ fontFamily: FONT, background: theme.pageBg, minHeight: '100%', padding: '32px 28px 60px', transition: 'background .25s' }}>
+      <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: theme.text, letterSpacing: '-0.015em' }}>Orders</h1>
+      <p style={{ margin: '8px 0 0', fontSize: 14.5, color: theme.textMuted }}>Manage all order types from one place.</p>
+
+      <div style={{ marginTop: 22 }}>
+        <TabNav theme={theme} tab={tab} setTab={setTab} counts={counts} />
       </div>
 
-      {/* Tab bar */}
-      <div style={{
-        display: 'flex', gap: 4,
-        borderBottom: `2px solid ${TC.g200}`,
-        marginBottom: 24,
-      }}>
-        {TABS.map(tab => {
-          const Icon = tab.icon
-          const active = activeTab === tab.key
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '11px 20px',
-                border: 'none',
-                borderBottom: `3px solid ${active ? '#E8192C' : 'transparent'}`,
-                marginBottom: -2,
-                background: 'transparent',
-                color: active ? '#E8192C' : TC.g500,
-                fontSize: 13, fontWeight: active ? 800 : 500,
-                cursor: 'pointer', fontFamily: 'inherit',
-                transition: 'all .15s',
-              }}
-            >
-              <Icon size={15} />
-              {tab.label}
-              {counts[tab.key] > 0 && (
-                <span style={{
-                  background: active ? '#E8192C' : TC.g200,
-                  color: active ? '#fff' : TC.g600,
-                  fontSize: 10, fontWeight: 800,
-                  padding: '1px 7px', borderRadius: 20,
-                  minWidth: 18, textAlign: 'center',
-                }}>
-                  {counts[tab.key]}
-                </span>
-              )}
-            </button>
-          )
-        })}
+      <div style={{ marginTop: 22 }}>
+        {tab === 'preverified' && <PreVerifiedTab theme={theme} />}
+        {tab === 'agency' && <AgencyTab theme={theme} />}
+        {tab === 'structure' && <StructureTab theme={theme} />}
       </div>
-
-      {/* Tab content */}
-      {activeTab === 'preverified' && <PreVerifiedTab TC={TC} isDark={isDark} />}
-      {activeTab === 'agency'      && <AgencyTab      TC={TC} isDark={isDark} />}
-      {activeTab === 'structure'   && <StructureTab   TC={TC} isDark={isDark} />}
     </div>
-  )
+  );
 }

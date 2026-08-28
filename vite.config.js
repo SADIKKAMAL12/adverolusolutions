@@ -161,14 +161,27 @@ export default defineConfig({
           // Admin pages — not loaded by regular users
           'admin': [
             './src/admin/AdminDashboard.jsx',
-            './src/admin/AdminOtherPages.jsx',
+            './src/admin/AdminInventoryPage.jsx',
+            './src/admin/AdminUsersPage.jsx',
+            './src/admin/AdminOrdersPage.jsx',
+            './src/admin/AdminDepositsPage.jsx',
+            './src/admin/AdminTicketsPage.jsx',
+            './src/admin/AdminReportsPage.jsx',
+            './src/admin/AdminSettingsPage.jsx',
+            './src/admin/AdminAgencyAdAccountsPage.jsx',
+            './src/admin/AdminUserInfoPage.jsx',
             './src/admin/AdminAllOrdersPage.jsx',
             './src/admin/AdminStructureOrdersPage.jsx',
             './src/admin/AdminPolicyManagementPage.jsx',
             './src/admin/AdminPolicyPaymentsPage.jsx',
             './src/admin/AdminAccountTypesPage.jsx',
             './src/admin/AdminWhatsAppPage.jsx',
+            './src/admin/AdminOrderNotificationsPage.jsx',
+  './src/admin/AdminVerificationsPage.jsx',
+  './src/admin/AdminVerificationSettingsPage.jsx',
+  './src/admin/AdminTextVerifiedSettingsPage.jsx',
             './src/admin/AdminStructureAssetsPage.jsx',
+            './src/admin/AdminAppearancePage.jsx',
           ],
           // Policy portal — only loaded on /policies route
           'policies': [

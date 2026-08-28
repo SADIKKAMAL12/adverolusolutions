@@ -66,19 +66,32 @@ export function isPublicPath(method, pathname, searchParams) {
   if (pathname.startsWith('/api/otp'))              return true
   if (pathname === '/api/email-otp' && (searchParams?.get?.('action') === 'send' || searchParams?.get?.('action') === 'verify')) return true
   if (pathname.startsWith('/api/whatsapp'))         return true
+  // Forgot-password (email OTP + reset) — the user isn't logged in yet, so
+  // every step of this flow has to be public. Ownership/proof-of-identity is
+  // enforced inside password-reset.js itself (via the emailed OTP and the
+  // signed, short-lived reset token), not by session auth.
+  if (pathname === '/api/password-reset' && method === 'POST') {
+    const action = searchParams?.get?.('action')
+    if (action === 'request' || action === 'verify' || action === 'complete') return true
+  }
   if (pathname === '/api/platform-config' && method === 'GET') return true
   if (pathname === '/api/policies' && method === 'GET') return true
   if (pathname === '/api/payment-methods' && method === 'GET') return true
   if (pathname === '/api/policy-orders' && method === 'POST') return true
+  if (pathname === '/api/appearance-settings' && method === 'GET') return true
+  if (pathname === '/api/public-products' && method === 'GET') return true
   if (pathname === '/api/account-types' && method === 'GET') return true
   if (pathname === '/api/admin/platform-settings' && method === 'GET') return true
   if (pathname === '/api/admin/upload-asset' && method === 'POST') return true
-  // User registration: POST /api/crud?table=users
-  if (pathname === '/api/crud' && method === 'POST') {
-    const table = typeof searchParams?.get === 'function'
-      ? searchParams.get('table')
-      : searchParams?.table
-    if (table === 'users') return true
-  }
+  // Called by Supabase pg_cron (no browser session) — gated by its own
+  // shared-secret check inside the handler, not session auth.
+  if (pathname === '/api/textverified' && method === 'POST' && searchParams?.get?.('action') === 'sweep') return true
+  if (pathname === '/api/verification-requests' && method === 'GET' && searchParams?.get?.('token')) return true
+  if (pathname === '/api/verification-requests' && method === 'PATCH' && searchParams?.get?.('token')) return true
+  // Registration goes exclusively through /api/auth/register now — the old
+  // POST /api/crud?table=users path used to double as a second, weaker
+  // registration flow (client-side password hashing, no session cookie set,
+  // no validation that the hash was even well-formed). Removed as a public
+  // path; the generic users handler now requires admin for any write.
   return false
 }

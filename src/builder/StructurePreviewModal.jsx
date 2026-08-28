@@ -2,7 +2,7 @@ import { useMemo, memo } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, ConnectionMode, BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
 import { useTheme } from '../shared/ThemeContext.jsx'
 import { getThemeColors } from '../shared/theme.js'
-import { nodeTypes } from './nodes/NodeTypes.jsx'
+import BaseNode from './nodes/BaseNode.jsx'
 import { getConnectionMeta } from './nodes/nodeRegistry.js'
 import { X, Package, Clock, DollarSign, User, Hash } from 'lucide-react'
 
@@ -47,6 +47,7 @@ const PreviewEdge = memo(function PreviewEdge({ id, sourceX, sourceY, targetX, t
 })
 
 const edgeTypes = { custom: PreviewEdge }
+const nodeTypes = { base: BaseNode }
 
 export default function StructurePreviewModal({ isOpen, onClose, order }) {
   const { theme } = useTheme()
@@ -57,7 +58,9 @@ export default function StructurePreviewModal({ isOpen, onClose, order }) {
     if (!order?.nodes_json) return []
     try {
       const parsed = JSON.parse(order.nodes_json)
-      return Array.isArray(parsed) ? parsed : []
+      return Array.isArray(parsed)
+        ? parsed.map(n => ({ ...n, data: { ...n.data, readOnly: true } }))
+        : []
     } catch {
       return []
     }

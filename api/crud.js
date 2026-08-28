@@ -6,7 +6,6 @@ export const otpStore = new Map()
 
 // Mutable structure assets — stored here so PUT mutations survive the per-request module cache-busting
 // null = not yet initialized; structure-assets.js lazily fills it with defaults
-export const sharedState = { structureAssets: null }
 
 // Fields only an admin may write on a user record
 const ADMIN_ONLY_FIELDS = ['role', 'status', 'balance', 'accounts', 'email']
@@ -42,14 +41,18 @@ async function handleUsers(req, res) {
   }
 
   if (req.method === 'POST') {
-    // Registration — req.user is null here (public route)
+    // Self-registration goes exclusively through /api/auth/register now
+    // (proper server-side bcrypt + session cookie in one step). This path
+    // is admin-only — reserved for a future "create user manually" admin
+    // feature, not a second public registration flow.
+    if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
     const body = { ...(req.body || {}) }
     if (!body.id) body.id = crypto.randomUUID()
-    // Force safe defaults — callers cannot self-assign admin role or arbitrary balance
-    body.role     = 'user'
-    body.status   = 'active'
-    body.balance  = 0
-    body.accounts = 0
+    // Force safe defaults even for admin-created accounts
+    body.role     = body.role === 'admin' ? 'admin' : 'user'
+    body.status   = body.status || 'active'
+    body.balance  = Number(body.balance) || 0
+    body.accounts = Number(body.accounts) || 0
     const { data, error } = await sb.from('users').insert(body).select().single()
     if (error) {
       // Surface duplicate-email as a friendly message
@@ -196,6 +199,16 @@ async function handleDeposits(req, res) {
     if (updates.status && !ALLOWED_STATUSES.includes(updates.status)) {
       return res.status(400).json({ error: 'Invalid status value' })
     }
+    // A deposit's `amount` is what admin/deposits/approve.js later trusts as the exact
+    // sum to credit — validate it here so a bad edit can't silently authorize an
+    // absurd or negative credit down the line.
+    if (updates.amount !== undefined) {
+      const amt = Number(updates.amount)
+      if (!Number.isFinite(amt) || amt <= 0 || amt > 1_000_000) {
+        return res.status(400).json({ error: 'Invalid deposit amount' })
+      }
+      updates.amount = amt
+    }
     const { data, error } = await sb.from('deposits').update(updates).eq('id', id).select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ success: true, ...data })
@@ -255,10 +268,16 @@ async function handleTransactions(req, res) {
     return res.status(200).json(data || [])
   }
 
-  // Only admins can create or modify transaction records
+  // Only admins can create or modify transaction records — this is a manual ledger
+  // entry, not a balance mutation itself, but validated anyway since a bad/fabricated
+  // row here undermines the transactions table's value as an audit trail.
   if (req.method === 'POST') {
     if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
     const body = req.body || {}
+    if (!body.user_id) return res.status(400).json({ error: 'user_id required' })
+    const amt = Number(body.amount)
+    if (!Number.isFinite(amt)) return res.status(400).json({ error: 'amount must be a valid number' })
+    body.amount = amt
     const { data, error } = await sb.from('transactions').insert(body).select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(201).json({ success: true, ...data })
@@ -268,6 +287,11 @@ async function handleTransactions(req, res) {
     if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
     const { id, ...updates } = req.body || {}
     if (!id) return res.status(400).json({ error: 'ID required for update' })
+    if (updates.amount !== undefined) {
+      const amt = Number(updates.amount)
+      if (!Number.isFinite(amt)) return res.status(400).json({ error: 'amount must be a valid number' })
+      updates.amount = amt
+    }
     const { data, error } = await sb.from('transactions').update(updates).eq('id', id).select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ success: true, ...data })
@@ -403,13 +427,31 @@ async function handlePurchases(req, res) {
   const sb = getSupabase()
 
   if (req.method === 'GET') {
-    let q = sb.from('purchases').select('*').order('created_at', { ascending: false })
+    let q = sb.from('purchases').select('*, users!user_id(email)').order('created_at', { ascending: false })
     const { user_id } = req.query
     const effectiveUserId = req.user?.role === 'admin' ? user_id : req.user?.id
     if (effectiveUserId) q = q.eq('user_id', effectiveUserId)
     const { data, error } = await q
     if (error) return res.status(500).json({ error: error.message })
-    return res.status(200).json(data || [])
+    const rows = (data || []).map(r => {
+      const { users, ...rest } = r
+      // Aliases so this feeds the admin "orders" list view directly, without
+      // that page needing to know purchases' own internal column names.
+      return { ...rest, user_email: users?.email || rest.user_id, amount: rest.price, date: rest.purchased_at }
+    })
+    return res.status(200).json(rows)
+  }
+
+  if (req.method === 'PUT') {
+    // Only admins may change a purchase's tracking status
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+    const { id, status } = req.body || {}
+    if (!id) return res.status(400).json({ error: 'ID required for update' })
+    const ALLOWED = ['pending', 'processing', 'completed', 'cancelled']
+    if (status && !ALLOWED.includes(status)) return res.status(400).json({ error: 'Invalid status value' })
+    const { data, error } = await sb.from('purchases').update({ status }).eq('id', id).select().single()
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json({ success: true, ...data })
   }
 
   if (req.method === 'POST') {
@@ -429,11 +471,13 @@ async function handlePurchases(req, res) {
     const cost = Number(product.price || 0)
     if (isNaN(cost) || cost < 0) return res.status(400).json({ error: 'Invalid product price' })
 
-    // Fresh server-side balance check — never trust client-side balance
-    const { data: userData } = await sb.from('users').select('balance').eq('id', userId).single()
-    const currentBalance = userData?.balance ?? 0
-    if (cost > 0 && currentBalance < cost) {
-      return res.status(400).json({ error: 'Insufficient balance' })
+    // Atomic, row-locked deduction — closes a real race where two concurrent purchase
+    // requests could both read the same stale balance and both pass a plain
+    // `currentBalance < cost` check before either write landed (double-spend).
+    if (cost > 0) {
+      const { data: deduction, error: deductErr } = await sb.rpc('deduct_balance', { p_user_id: userId, p_amount: cost })
+      if (deductErr) return res.status(500).json({ error: deductErr.message })
+      if (!deduction?.ok) return res.status(400).json({ error: deduction?.error || 'Insufficient balance' })
     }
 
     // Verify the requested line is still available (prevent race condition / stock theft)
@@ -441,11 +485,15 @@ async function handlePurchases(req, res) {
     if (lineId) {
       const { data: lineData } = await sb.from('inventory_lines').select('status').eq('id', lineId).single()
       if (!lineData || lineData.status !== 'available') {
+        if (cost > 0) await sb.rpc('refund_balance', { p_user_id: userId, p_amount: cost })
         return res.status(409).json({ error: 'This account is no longer available. Please try another.' })
       }
       // Lock the line immediately before any other operation
       const { error: lockErr } = await sb.from('inventory_lines').update({ status: 'sold' }).eq('id', lineId).eq('status', 'available')
-      if (lockErr) return res.status(500).json({ error: lockErr.message })
+      if (lockErr) {
+        if (cost > 0) await sb.rpc('refund_balance', { p_user_id: userId, p_amount: cost })
+        return res.status(500).json({ error: lockErr.message })
+      }
     }
 
     const insertData = {
@@ -465,15 +513,10 @@ async function handlePurchases(req, res) {
 
     const { data, error } = await sb.from('purchases').insert(insertData).select().single()
     if (error) {
-      // Roll back line status if purchase insert fails
+      // Roll back line status and the already-deducted balance if the insert fails
       if (lineId) await sb.from('inventory_lines').update({ status: 'available' }).eq('id', lineId)
+      if (cost > 0) await sb.rpc('refund_balance', { p_user_id: userId, p_amount: cost })
       return res.status(500).json({ error: error.message })
-    }
-
-    // Deduct balance after all checks pass
-    if (cost > 0) {
-      const newBalance = Math.max(0, currentBalance - cost)
-      await sb.from('users').update({ balance: newBalance }).eq('id', userId)
     }
 
     // Notify admin
@@ -500,18 +543,56 @@ async function handlePurchases(req, res) {
   return res.status(405).json({ error: 'Method not allowed' })
 }
 
-// ── Support tickets handler (in-memory, but with proper ownership checks —
-// this used to fall through to the generic mock CRUD below with no ownership
-// filtering at all, meaning every user could see and modify everyone else's
-// tickets) ──────────────────────────────────────────────────────────────────
-async function handleSupportTickets(req, res) {
-  const isAdmin = req.user?.role === 'admin'
-  const tickets = stores.support_tickets
+// ── Supabase-backed business types handler ────────────────────────────────────
+async function handleBusinessTypes(req, res) {
+  const sb = getSupabase()
 
   if (req.method === 'GET') {
-    const uid = isAdmin ? (req.query.user_id || null) : req.user?.id
-    const filtered = uid ? tickets.filter(t => String(t.user_id) === String(uid)) : [...tickets]
-    return res.status(200).json(filtered)
+    const { data, error } = await sb.from('business_types').select('*').order('sort_order', { ascending: true })
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json(data || [])
+  }
+
+  if (req.method === 'POST') {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+    const body = req.body || {}
+    if (!body.name) return res.status(400).json({ error: 'Name required' })
+    const { error } = await sb.from('business_types').insert({ name: body.name })
+    if (error) {
+      if (error.message?.includes('duplicate')) return res.status(200).json({ success: true }) // already exists — no-op
+      return res.status(500).json({ error: error.message })
+    }
+    return res.status(201).json({ success: true })
+  }
+
+  if (req.method === 'DELETE') {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+    const id = req.query.id
+    if (!id) return res.status(400).json({ error: 'ID required for delete' })
+    const { error } = await sb.from('business_types').delete().eq('id', id)
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json({ success: true })
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' })
+}
+
+// ── Supabase-backed support tickets handler ───────────────────────────────────
+async function handleSupportTickets(req, res) {
+  const sb      = getSupabase()
+  const isAdmin = req.user?.role === 'admin'
+
+  if (req.method === 'GET') {
+    let q = sb.from('support_tickets').select('*').order('created_at', { ascending: false })
+    if (!isAdmin) {
+      if (!req.user?.id) return res.status(403).json({ error: 'Forbidden' })
+      q = q.eq('user_id', req.user.id)
+    } else if (req.query.user_id) {
+      q = q.eq('user_id', req.query.user_id)
+    }
+    const { data, error } = await q
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json(data || [])
   }
 
   if (req.method === 'POST') {
@@ -526,30 +607,34 @@ async function handleSupportTickets(req, res) {
       category:   String(body.category || 'Other').slice(0, 100),
       message:    String(body.message || '').slice(0, 5000),
       status:     'open',
-      created_at: new Date().toISOString(),
     }
-    tickets.unshift(ticket)
-    return res.status(201).json({ success: true, ...ticket })
+    if (!ticket.subject || !ticket.message) {
+      return res.status(400).json({ error: 'Subject and message are required' })
+    }
+    const { data, error } = await sb.from('support_tickets').insert(ticket).select().single()
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(201).json({ success: true, ...data })
   }
 
   if (req.method === 'PUT') {
     // Only admins may update tickets (e.g. change status / add notes)
     if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
-    const { id, ...updates } = req.body || {}
+    const { id, ...body } = req.body || {}
     if (!id) return res.status(400).json({ error: 'ID required for update' })
-    const idx = tickets.findIndex(t => String(t.id) === String(id))
-    if (idx === -1) return res.status(404).json({ error: 'Ticket not found' })
-    tickets[idx] = { ...tickets[idx], ...updates }
-    return res.status(200).json({ success: true, ...tickets[idx] })
+    const updates = { updated_at: new Date().toISOString() }
+    if (body.status      !== undefined) updates.status      = body.status
+    if (body.admin_reply !== undefined) updates.admin_reply = body.admin_reply
+    const { data, error } = await sb.from('support_tickets').update(updates).eq('id', id).select().single()
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json({ success: true, ...data })
   }
 
   if (req.method === 'DELETE') {
     if (!isAdmin) return res.status(403).json({ error: 'Admin only' })
     const id = req.query.id
     if (!id) return res.status(400).json({ error: 'ID required for delete' })
-    const idx = tickets.findIndex(t => String(t.id) === String(id))
-    if (idx === -1) return res.status(404).json({ error: 'Not found' })
-    tickets.splice(idx, 1)
+    const { error } = await sb.from('support_tickets').delete().eq('id', id)
+    if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ success: true })
   }
 
@@ -558,8 +643,6 @@ async function handleSupportTickets(req, res) {
 
 // Generic CRUD mock API for all tables — exported so other handlers can share state
 export const stores = {
-  structure_orders: [],
-  structure_drafts: [],
   users: [
     { id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890", name: "John Doe", email: "john.doe@example.com", balance: 1240, accounts: 12, status: "active", joined: "Jan 5, 2024", role: "user", password_hash: "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi" },
     { id: "b2c3d4e5-f6a7-8901-bcde-f12345678901", name: "William Smith", email: "william@example.com", balance: 850, accounts: 8, status: "active", joined: "Jan 18, 2024", role: "user", password_hash: "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi" },
@@ -582,15 +665,6 @@ export const stores = {
     { id: "pm-1", name: "Payoneer", bank_name: "Payoneer", logo: "💳", account: "adver@solution.com", active: true },
     { id: "pm-2", name: "Wise", bank_name: "Wise", logo: "💳", account: "adver@solution.com", active: true },
   ],
-  business_types: [
-    { id: 1, name: "Marketing Agency" },
-    { id: 2, name: "E-Commerce Brand" },
-    { id: 3, name: "Freelancer" },
-    { id: 4, name: "Startup" },
-    { id: 5, name: "Enterprise" },
-    { id: 6, name: "Other" },
-  ],
-  support_tickets: [],
   inventory_products: [
     { id: "prod-1", platform: "Meta", type: "Aged", title: "Meta Aged Accounts (US)", description: "High-quality aged Meta Business Manager accounts.", price: 120, country: "United States", created: "May 20, 2024" },
     { id: "prod-2", platform: "Google", type: "Aged", title: "Google Aged Accounts (US)", description: "Mature Google Ads accounts with billing history.", price: 110, country: "United States", created: "May 18, 2024" },
@@ -616,10 +690,6 @@ export const stores = {
     { id: "l12", product_id: "prod-1", email: "ava.dav***@gmail.com", password: "Pass012!", twofa: "J9K0 L1M2", status: "available" },
   ],
   purchases: [],
-  projects: [],
-  announcements: [
-    { id: 1, icon: "📢", title: "New: TikTok Ads Accounts", body: "TikTok accounts are now available!", date: "May 20, 2024" },
-  ],
   ad_account_requests: [],
   settings: {
     business_name: "AdverSolutions",
@@ -687,22 +757,19 @@ async function handleAdAccountRequests(req, res) {
       }
     }
 
-    // ── Balance check: user must have enough balance to cover the amount ──
+    // ── Balance check + hold: atomic, row-locked deduction — closes a real race
+    // where two concurrent submissions could both read the same stale balance and
+    // both pass a plain `currentBalance < amount` check before either write landed.
     if (amount > 0 && userId) {
-      const { data: userData, error: balErr } = await sb
-        .from('users').select('balance').eq('id', userId).single()
-      if (balErr) return res.status(500).json({ error: balErr.message })
-      const currentBalance = parseFloat(userData?.balance ?? 0)
-      if (currentBalance < amount) {
+      const { data: deduction, error: deductErr } = await sb.rpc('deduct_balance', { p_user_id: userId, p_amount: amount })
+      if (deductErr) return res.status(500).json({ error: deductErr.message })
+      if (!deduction?.ok) {
         return res.status(400).json({
-          error: `Insufficient balance. Your current balance is $${currentBalance.toFixed(2)} but this request requires $${amount.toFixed(2)}. Please top up your account balance first.`,
+          error: deduction?.balance != null
+            ? `Insufficient balance. Your current balance is $${Number(deduction.balance).toFixed(2)} but this request requires $${amount.toFixed(2)}. Please top up your account balance first.`
+            : (deduction?.error || 'Insufficient balance'),
         })
       }
-      // Deduct balance immediately so funds are held for this request
-      const newBalance = parseFloat((currentBalance - amount).toFixed(2))
-      const { error: deductErr } = await sb
-        .from('users').update({ balance: newBalance }).eq('id', userId)
-      if (deductErr) return res.status(500).json({ error: deductErr.message })
       // Record the transaction
       try {
         await sb.from('transactions').insert({
@@ -713,7 +780,7 @@ async function handleAdAccountRequests(req, res) {
           status: 'pending',
           date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         })
-      } catch { /* non-fatal: request still proceeds even if the log entry fails */ }
+      } catch (e) { console.error('[ad_account_requests] transaction log insert failed', e.message) }
     }
 
     const id = String(Date.now())
@@ -735,6 +802,22 @@ async function handleAdAccountRequests(req, res) {
       storedAmount = parseFloat((amount / (1 + platformFeePercent / 100)).toFixed(2))
     }
 
+    // Everything else the user submitted (websites, gmail, snap_profile, or any
+    // admin-defined custom field for this platform) used to be silently dropped
+    // here — only bm_id and page_links had dedicated columns. Captured generically
+    // into `metadata` instead, so no admin-configured field is ever lost.
+    const KNOWN_TOP_LEVEL_FIELDS = new Set([
+      'user_id', 'amount', 'account_name', 'business_name', 'business_type',
+      'business_email', 'bm_id', 'business_center_id', 'platform', 'page_links',
+    ])
+    const metadata = {}
+    for (const [k, v] of Object.entries(body)) {
+      if (KNOWN_TOP_LEVEL_FIELDS.has(k)) continue
+      if (v === undefined || v === null || v === '') continue
+      if (Array.isArray(v) && v.filter(Boolean).length === 0) continue
+      metadata[k] = Array.isArray(v) ? v.filter(Boolean) : v
+    }
+
     const record = {
       id,
       user_id:        userId || null,
@@ -746,14 +829,24 @@ async function handleAdAccountRequests(req, res) {
       business_email: body.business_email || null,
       bm_id:          body.bm_id || body.business_center_id || null,
       page_links:     pageLinks,
+      metadata:       Object.keys(metadata).length ? metadata : null,
       status:         'pending',
       amount:         storedAmount,
+      // The amount actually deducted from the user's balance — may differ from
+      // `amount` above for top-ups, where `amount` stores only the principal
+      // with the platform fee backed out. Kept so a later rejection can refund
+      // the exact amount that was really taken, not a recomputed guess.
+      charged_amount: amount,
       request_id:     `#AAR-${id}`,
       submitted_at:   submitted,
     }
 
     const { data, error } = await sb.from('ad_account_requests').insert(record).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) {
+      // Roll back the already-deducted hold if the request row itself failed to save
+      if (amount > 0 && userId) await sb.rpc('refund_balance', { p_user_id: userId, p_amount: amount })
+      return res.status(500).json({ error: error.message })
+    }
 
     sendOrderNotification('agency', {
       ticket_id: record.request_id,
@@ -781,6 +874,93 @@ async function handleAdAccountRequests(req, res) {
         return res.status(403).json({ error: 'Access denied' })
       }
     }
+
+    // If this update is a rejection, make the pending -> rejected transition itself
+    // the race guard: only the request whose UPDATE actually flips the status (via
+    // the .eq('status', 'pending') below) gets to refund. Two concurrent "reject"
+    // clicks can no longer both see status !== 'rejected' and both refund.
+    if (updates.status === 'rejected') {
+      const { data: before } = await sb.from('ad_account_requests').select('status, user_id, charged_amount').eq('id', id).single()
+      const charged = Number(before?.charged_amount || 0)
+
+      const { data, error } = await sb
+        .from('ad_account_requests')
+        .update(updates)
+        .eq('id', id)
+        .eq('status', 'pending') // only succeeds for the first writer
+        .select()
+        .single()
+      if (error) return res.status(500).json({ error: error.message })
+
+      if (data && charged > 0 && before?.user_id) {
+        const { error: refundErr } = await sb.rpc('refund_balance', { p_user_id: before.user_id, p_amount: charged })
+        if (refundErr) {
+          console.error('[ad_account_requests] refund failed', before.user_id, charged, refundErr.message)
+        } else {
+          try {
+            await sb.from('transactions').insert({
+              user_id: before.user_id,
+              type:    'Agency Account Request Refund',
+              method:  'Balance Credit',
+              amount:  charged,
+              status:  'completed',
+              date:    new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            })
+          } catch (e) { console.error('[ad_account_requests] transaction log insert failed (refund)', e.message) }
+        }
+      }
+
+      // Row was already 'rejected' (or otherwise not 'pending') by the time this
+      // request landed — apply the update anyway (idempotent for non-status fields)
+      // but skip refunding again.
+      if (!data) {
+        const { data: fallback, error: fallbackErr } = await sb.from('ad_account_requests').update(updates).eq('id', id).select().single()
+        if (fallbackErr) return res.status(500).json({ error: fallbackErr.message })
+        return res.status(200).json(fallback)
+      }
+
+      return res.status(200).json(data)
+    }
+
+    // Correcting a mistaken rejection (moving the request OFF 'rejected' to anything
+    // else) must re-charge the customer — otherwise the earlier refund stands and
+    // whatever the admin marks it as next (approved/in review) is delivered for free.
+    // Blocked entirely if the customer can no longer afford it.
+    if (updates.status !== undefined && updates.status !== 'rejected') {
+      const { data: before } = await sb.from('ad_account_requests').select('status, user_id, charged_amount').eq('id', id).single()
+      const charged = Number(before?.charged_amount || 0)
+
+      if (before?.status === 'rejected' && charged > 0 && before?.user_id) {
+        const { data: recharge, error: rechargeErr } = await sb.rpc('deduct_balance', { p_user_id: before.user_id, p_amount: charged })
+        if (rechargeErr) return res.status(500).json({ error: rechargeErr.message })
+        if (!recharge?.ok) {
+          return res.status(400).json({
+            error: `Cannot un-reject: customer's balance is insufficient to re-charge $${charged.toFixed(2)}` +
+              (recharge?.balance != null ? ` (current balance: $${Number(recharge.balance).toFixed(2)})` : '') +
+              '. Ask them to top up first.',
+          })
+        }
+
+        const { data, error } = await sb.from('ad_account_requests').update(updates).eq('id', id).select().single()
+        if (error) {
+          // Roll back the re-charge if the status update itself fails to save
+          await sb.rpc('refund_balance', { p_user_id: before.user_id, p_amount: charged })
+          return res.status(500).json({ error: error.message })
+        }
+        try {
+          await sb.from('transactions').insert({
+            user_id: before.user_id,
+            type:    'Agency Account Request Re-charge (correction)',
+            method:  'Balance Deduction',
+            amount:  -charged,
+            status:  'completed',
+            date:    new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          })
+        } catch (e) { console.error('[ad_account_requests] transaction log insert failed (recharge)', e.message) }
+        return res.status(200).json(data)
+      }
+    }
+
     const { data, error } = await sb.from('ad_account_requests').update(updates).eq('id', id).select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)
@@ -814,6 +994,7 @@ export default async function handler(req, res) {
     if (table === 'ad_account_requests') return handleAdAccountRequests(req, res)
   }
   if (table === 'support_tickets') return handleSupportTickets(req, res)
+  if (table === 'business_types')  return handleBusinessTypes(req, res)
 
   // structure_orders / structure_drafts have their own dedicated, properly
   // access-controlled handlers (api/structure-orders.js, api/structure-drafts.js)

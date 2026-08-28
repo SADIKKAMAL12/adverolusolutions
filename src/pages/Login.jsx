@@ -85,9 +85,6 @@ export default function Login() {
           )}
         </div>
 
-        <div style={{ marginTop: 16, textAlign: 'center' }}>
-          <a href="#/admin/login" style={{ fontSize: 12, color: 'var(--muted)' }}>Admin login →</a>
-        </div>
       </div>
 
       <div className="auth__hero">

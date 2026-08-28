@@ -11,6 +11,7 @@ const NAV = [
   { id: 'support', label: 'Support', icon: 'chat', group: 'Account', hash: '#/support' },
   { id: 'structure-builder', label: 'Structure Builder', icon: 'layers', group: 'Account', hash: '#/structure-builder' },
   { id: 'saved-structures', label: 'Saved Structures', icon: 'bookmark', group: 'Account', hash: '#/saved-structures' },
+  { id: 'phone-verifications', label: 'Phone Verifications', icon: 'phone', group: 'Account', hash: '#/phone-verifications' },
 ];
 
 function initials(name) {

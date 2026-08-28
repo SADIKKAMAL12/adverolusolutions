@@ -429,15 +429,17 @@ export default function PreVerifiedAccounts() {
     if (!linesToBuy?.length) return;
     setError(null);
     setBuying(true);
+    // The server (`POST /api/purchases`) already locks the chosen line atomically
+    // (checks it's still available, marks it sold, deducts balance, rolls back on
+    // failure) — a separate client-side `PUT /api/inventory-lines` call used to run
+    // first here, but that endpoint is admin-only and always rejected regular users,
+    // blocking every purchase before it could even reach /api/purchases.
+    const purchases = [];
+    const soldLineIds = [];
+    let spent = 0;
     try {
-      const total = Number(product.price) * qty;
-
-      /* Mark all lines as sold */
-      await Promise.all(linesToBuy.map(l => api.put('/api/inventory-lines', { id: l.id, status: 'sold' })));
-
       /* Create one purchase record per line (with credentials), sequentially to avoid balance race */
       const now = new Date().toLocaleString();
-      const purchases = [];
       for (let i = 0; i < linesToBuy.length; i++) {
         const l = linesToBuy[i];
         const rec = await api.post('/api/purchases', {
@@ -455,24 +457,31 @@ export default function PreVerifiedAccounts() {
           purchased_at: now,
         });
         purchases.push(rec);
+        soldLineIds.push(l.id);
+        spent += Number(product.price);
+        // Reflect each successful purchase immediately, so a later failure in this
+        // same batch (e.g. buying qty > 1 and a line runs out mid-way) doesn't leave
+        // the UI showing a stale balance/inventory state for the ones that DID succeed.
+        setStore(s => ({
+          ...s,
+          inventoryLines: (s.inventoryLines || []).map(line =>
+            line.id === l.id ? { ...line, status: 'sold' } : line
+          ),
+          purchases: [rec, ...(s.purchases || [])],
+          balance: typeof s.balance === 'number' ? s.balance - Number(product.price) : s.balance,
+        }));
       }
-
-      /* Update store */
-      setStore(s => ({
-        ...s,
-        inventoryLines: (s.inventoryLines || []).map(l =>
-          linesToBuy.some(lb => lb.id === l.id) ? { ...l, status: 'sold' } : l
-        ),
-        purchases: [...purchases, ...(s.purchases || [])],
-        balance: typeof s.balance === 'number' ? s.balance - total : s.balance,
-      }));
 
       setBuyProduct(null);
       setDetailProduct(null);
       setLastPurchase({ ...purchases[0], product_title: product.title, quantity: qty });
-      setSuccess(`Purchased ${qty > 1 ? `${qty}× ` : ''}${product.title} for ${fmtMoney(total)}.`);
+      setSuccess(`Purchased ${qty > 1 ? `${qty}× ` : ''}${product.title} for ${fmtMoney(spent)}.`);
     } catch (err) {
-      setError(err.message);
+      if (purchases.length) {
+        setError(`${err.message} (${purchases.length} of ${qty} completed before this error — your balance already reflects those.)`);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setBuying(false);
     }

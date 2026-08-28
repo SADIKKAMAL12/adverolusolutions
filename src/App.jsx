@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Router, Route } from './shared/Router.jsx';
+import { Router, Route, usePath, useNavigate as useRouterNavigate } from './shared/Router.jsx';
 import { AuthProvider, useAuth } from './shared/AuthContext.jsx';
 import { ThemeProvider, useTheme } from './shared/ThemeContext.jsx';
 import { getThemeColors } from './shared/theme.js';
@@ -13,33 +13,51 @@ import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import AgencyAdAccounts from './pages/AgencyAdAccounts.jsx';
 import PreVerifiedAccounts from './pages/PreVerifiedAccounts.jsx';
+import PhoneVerifications from './pages/PhoneVerifications.jsx';
 import Orders from './pages/Orders.jsx';
 import Balance from './pages/Balance.jsx';
 import Support from './pages/Support.jsx';
 import StructureBuilder from './pages/StructureBuilder.jsx';
 
 // Admin pages (unchanged)
-import AdminLoginPage from './user/AdminLoginPage.jsx';
 import AdminDashboard from './admin/AdminDashboard.jsx';
-import { AdminUsersPage, AdminInventoryPage, AdminOrdersPage, AdminDepositsPage, AdminTicketsPage, AdminReportsPage, AdminSettingsPage, AdminAgencyAdAccountsPage } from './admin/AdminOtherPages.jsx';
+import { AdminUsersPage } from './admin/AdminUsersPage.jsx';
+import { AdminInventoryPage } from './admin/AdminInventoryPage.jsx';
+import { AdminOrdersPage } from './admin/AdminOrdersPage.jsx';
+import { AdminDepositsPage } from './admin/AdminDepositsPage.jsx';
+import { AdminTicketsPage } from './admin/AdminTicketsPage.jsx';
+import { AdminReportsPage } from './admin/AdminReportsPage.jsx';
+import { AdminSettingsPage } from './admin/AdminSettingsPage.jsx';
+import { AdminAgencyAdAccountsPage } from './admin/AdminAgencyAdAccountsPage.jsx';
 import AdminWhatsAppPage from './admin/AdminWhatsAppPage.jsx';
+import AdminEmailOTPPage from './admin/AdminEmailOTPPage.jsx';
+import AdminOrderNotificationsPage from './admin/AdminOrderNotificationsPage.jsx';
 import AdminStructureAssetsPage from './admin/AdminStructureAssetsPage.jsx';
+import AdminAppearancePage from './admin/AdminAppearancePage.jsx';
 import AdminAllOrdersPage from './admin/AdminAllOrdersPage.jsx';
 import AdminPolicyManagementPage from './admin/AdminPolicyManagementPage.jsx';
 import AdminPolicyPaymentsPage from './admin/AdminPolicyPaymentsPage.jsx';
 import AdminAccountTypesPage from './admin/AdminAccountTypesPage.jsx';
+import AdminVerificationsPage from './admin/AdminVerificationsPage.jsx';
+import AdminVerificationSettingsPage from './admin/AdminVerificationSettingsPage.jsx';
+import AdminTextVerifiedSettingsPage from './admin/AdminTextVerifiedSettingsPage.jsx';
 import PolicyPortalPage from './policies/PolicyPortalPage.jsx';
 import SavedStructuresPage from './pages/SavedStructuresPage.jsx';
 
-// New public landing page + login/signup (added on top of the existing project, nothing else changed)
-import LandingPage from './landing-custom/LandingPage.jsx';
+// New public landing page + login/signup (added independently on dev)
+import ActiveLandingPage from './landing-custom/ActiveLandingPage.jsx';
+import { getTemplateByKey } from './landing-custom/templates/registry.js';
 import AuthPageWA from './user/AuthPageWA.jsx';
+import ForgotPasswordPage from './user/ForgotPasswordPage.jsx';
+import VerifyRequestPage from './user/VerifyRequestPage.jsx';
+import PublicProductsPage from './pages/PublicProductsPage.jsx';
 
 const USER_ROUTES = {
   '': Dashboard,
   'dashboard': Dashboard,
   'agency-ad-accounts': AgencyAdAccounts,
   'preverified-accounts': PreVerifiedAccounts,
+  'phone-verifications': PhoneVerifications,
   'orders': Orders,
   'balance': Balance,
   'support': Support,
@@ -71,11 +89,21 @@ function AdminApp() {
   const [store] = useStore();
   const { user, logout } = useAuth();
   const [hydrated, setHydrated] = useState(false);
+  const path = usePath();
+  const routerNavigate = useRouterNavigate();
 
   useEffect(() => {
     if (user?.id) syncPermsFromServer(user.id);
     hydrateStore().then(() => setHydrated(true));
   }, [user?.id]);
+
+  // Logging in from the regular /login page (rather than /admin's own login
+  // screen) never changes the hash — this component used to just assume the
+  // hash already pointed at a matching /admin/* route, leaving every <Route>
+  // unmatched (and the content area blank) whenever that assumption was wrong.
+  useEffect(() => {
+    if (!path.startsWith('/admin')) routerNavigate('/admin');
+  }, [path, routerNavigate]);
 
   const addBalance = (amount) => {
     setStore(s => ({ ...s, balance: (s.balance || 0) + amount }));
@@ -91,7 +119,7 @@ function AdminApp() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
-      <AdminSidebar role="admin" logout={logout} userId={user.id} />
+      <AdminSidebar role="admin" logout={logout} userId={user.id} user={user} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <TopBar role="admin" user={user} balance={0} />
         <ThemedAdminMain>
@@ -100,15 +128,21 @@ function AdminApp() {
           <Route path="/admin/inventory" element={<AdminInventoryPage products={store.inventoryProducts || []} lines={store.inventoryLines || []} setStore={setStore} />} />
           <Route path="/admin/orders" element={<AdminAllOrdersPage />} />
           <Route path="/admin/deposits" element={<AdminDepositsPage deposits={store.deposits || []} setStore={setStore} addBalance={addBalance} />} />
-          <Route path="/admin/tickets" element={<AdminTicketsPage tickets={store.supportTickets || []} />} />
+          <Route path="/admin/tickets" element={<AdminTicketsPage />} />
           <Route path="/admin/reports" element={<AdminReportsPage />} />
           <Route path="/admin/agency-accounts" element={<AdminAgencyAdAccountsPage requests={store.adAccountRequests || []} users={store.users || []} setStore={setStore} platformPrices={store.platformPrices || {}} />} />
           <Route path="/admin/policies" element={<AdminPolicyManagementPage />} />
           <Route path="/admin/policies/payments" element={<AdminPolicyPaymentsPage />} />
           <Route path="/admin/policies/account-types" element={<AdminAccountTypesPage />} />
+          <Route path="/admin/verifications" element={<AdminVerificationsPage />} />
+          <Route path="/admin/verification-settings" element={<AdminVerificationSettingsPage />} />
+          <Route path="/admin/textverified-settings" element={<AdminTextVerifiedSettingsPage />} />
           <Route path="/admin/settings" element={<AdminSettingsPage paymentMethods={store.paymentMethods || []} businessTypes={store.businessTypes || []} setStore={setStore} />} />
           <Route path="/admin/whatsapp" element={<AdminWhatsAppPage />} />
+          <Route path="/admin/email-otp" element={<AdminEmailOTPPage />} />
+          <Route path="/admin/order-notifications" element={<AdminOrderNotificationsPage />} />
           <Route path="/admin/structure-assets" element={<AdminStructureAssetsPage />} />
+          <Route path="/admin/appearance" element={<AdminAppearancePage />} />
           <Route path="/" element={<AdminDashboard users={store.users || []} orders={store.orders || []} deposits={store.deposits || []} />} />
         </ThemedAdminMain>
       </div>
@@ -145,6 +179,28 @@ function AppContent() {
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
 
+  if (hash.startsWith('#/verify/')) {
+    const token = hash.replace(/^#\/verify\//, '');
+    return <VerifyRequestPage token={token} />;
+  }
+
+  if (hash.startsWith('#/preview-landing/')) {
+    const key = decodeURIComponent(hash.replace(/^#\/preview-landing\//, ''));
+    const PreviewTemplate = getTemplateByKey(key).component;
+    return <PreviewTemplate onNavigateLogin={() => {}} onNavigateSignup={() => {}} />;
+  }
+
+  // Public product catalog — read-only, accessible whether logged in or not.
+  // Respects the admin's "products_page_enabled" toggle internally.
+  if (hash.startsWith('#/products')) {
+    return (
+      <PublicProductsPage
+        onNavigateLogin={() => { window.location.hash = '#/login'; }}
+        onNavigateSignup={() => { window.location.hash = '#/register'; }}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}>
@@ -154,10 +210,10 @@ function AppContent() {
   }
 
   if (!user) {
-    if (hash.startsWith('#/admin')) return <AdminLoginPage />;
     if (hash.startsWith('#/policies')) return <PolicyPortalPage />;
 
-    const hashKey = hash.replace(/^#\/?/, '') || '';
+    const isRoute = hash.startsWith('#/');
+    const hashKey = isRoute ? (hash.replace(/^#\/?/, '') || '') : '';
     if (hashKey === 'login') {
       return (
         <AuthPageWA
@@ -176,9 +232,12 @@ function AppContent() {
         />
       );
     }
+    if (hashKey === 'forgot-password') {
+      return <ForgotPasswordPage />;
+    }
     if (hashKey === '') {
       return (
-        <LandingPage
+        <ActiveLandingPage
           onNavigateLogin={() => { window.location.hash = '#/login'; }}
           onNavigateSignup={() => { window.location.hash = '#/register'; }}
         />

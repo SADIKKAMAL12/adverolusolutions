@@ -90,6 +90,8 @@ function BaseNode({ id, data, selected, dragging }) {
     window.dispatchEvent(new CustomEvent('builder-delete-node', { detail: { nodeId: id } }))
   }, [id])
 
+  const readOnly = !!data.readOnly
+
   const meta = NODE_REGISTRY[data.nodeType] || NODE_REGISTRY.profile
   const Icon = meta.icon
   const glow = t.glow
@@ -129,7 +131,7 @@ function BaseNode({ id, data, selected, dragging }) {
         }}
       >
         {/* delete */}
-        <DeleteBtn onClick={handleDelete} />
+        {!readOnly && <DeleteBtn onClick={handleDelete} />}
 
         <div style={{ position: 'relative', width: 220, height: 130 }}>
           <img src={data.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />
@@ -232,8 +234,8 @@ function BaseNode({ id, data, selected, dragging }) {
                 />
               ) : (
                 <div
-                  onDoubleClick={() => setEditingTitle(true)}
-                  title="Double-click to rename"
+                  onDoubleClick={() => !readOnly && setEditingTitle(true)}
+                  title={readOnly ? undefined : 'Double-click to rename'}
                   style={{
                     fontSize: 13, fontWeight: 800, color: t.text,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -260,8 +262,8 @@ function BaseNode({ id, data, selected, dragging }) {
                 />
               ) : (
                 <div
-                  onDoubleClick={() => setEditingSubtitle(true)}
-                  title="Double-click to edit"
+                  onDoubleClick={() => !readOnly && setEditingSubtitle(true)}
+                  title={readOnly ? undefined : 'Double-click to edit'}
                   style={{
                     fontSize: 10, color: t.text, opacity: 0.55, marginTop: 3,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -310,7 +312,7 @@ function BaseNode({ id, data, selected, dragging }) {
       </div>
 
       {/* Delete button — outside card so it's not clipped */}
-      <DeleteBtn onClick={handleDelete} />
+      {!readOnly && <DeleteBtn onClick={handleDelete} />}
 
       <Handles glow={glow} bg={t.bg} />
     </div>
@@ -357,10 +359,15 @@ function Handles({ glow, bg }) {
   })
   return (
     <>
-      <Handle type="target" position={Position.Top}    style={style({ top: -7 })} />
-      <Handle type="source" position={Position.Bottom} style={style({ bottom: -7 })} />
+      {/* All four handles are type="source" — with ConnectionMode.Loose, xyflow's
+          edge-position lookup only ever checks a node's *source*-type bounds for
+          the edge's sourceHandle (the target-side lookup is the only one that also
+          falls back to source bounds), so a handle used to start a drag must be
+          type="source" regardless of which visual dot the user grabbed. */}
+      <Handle type="source" position={Position.Top}    id="top"    style={style({ top: -7 })} />
+      <Handle type="source" position={Position.Bottom} id="bottom" style={style({ bottom: -7 })} />
       <Handle type="source" position={Position.Left}   id="left"  style={style({ left: -7,  width: 12, height: 12 })} />
-      <Handle type="target" position={Position.Right}  id="right" style={style({ right: -7, width: 12, height: 12 })} />
+      <Handle type="source" position={Position.Right}  id="right" style={style({ right: -7, width: 12, height: 12 })} />
     </>
   )
 }

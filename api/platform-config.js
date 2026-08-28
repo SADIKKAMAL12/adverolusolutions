@@ -58,14 +58,19 @@ export default async function handler(req, res) {
       const { data } = await sb.from('platform_prices').select('*')
       if (data) {
         data.forEach(p => {
-          pricing[p.id] = { price: p.price, fee: p.fee, minTopup: p.min_topup, active: p.active }
+          pricing[p.id] = { price: p.price, fee: p.fee, minTopup: p.min_topup, active: p.active, name: p.name }
         })
       }
     }
     // Merge: return array of platforms with both pricing and fields
+    // `name` is required by the frontend (e.g. AgencyAdAccounts.jsx reads
+    // p.name[0] for a fallback logo letter) — this response never included
+    // it before, crashing the "Create Ad Account" wizard for every platform.
+    const DEFAULT_NAMES = { meta: 'Meta (Facebook)', google: 'Google Ads', tiktok: 'TikTok Ads', snapchat: 'Snapchat Ads' }
     const platforms = ['meta', 'google', 'tiktok', 'snapchat']
     const result = platforms.map(id => ({
       id,
+      name:     pricing[id]?.name     ?? DEFAULT_NAMES[id] ?? (id.charAt(0).toUpperCase() + id.slice(1)),
       price:    pricing[id]?.price    ?? 50,
       fee:      pricing[id]?.fee      ?? 6,
       minTopup: pricing[id]?.minTopup ?? 200,

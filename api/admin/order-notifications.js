@@ -7,6 +7,7 @@ const DEFAULTS = {
   notify_agency: true,       // agency ad account requests
   notify_deposits: true,     // top-up / deposit requests
   notify_tickets: false,     // support tickets
+  notify_verification: true,  // account verification requests submitted
   message_template_order:
     '🛒 *New Order*\nTicket: {{ticket_id}}\nEmail: {{email}}\nType: {{account_type}}\nAmount: {{amount}}\nPayment: {{payment_method}}',
   message_template_agency:
@@ -15,6 +16,8 @@ const DEFAULTS = {
     '💰 *New Deposit / Top-Up*\nEmail: {{email}}\nAmount: {{amount}}\nMethod: {{payment_method}}\nStatus: Pending Review',
   message_template_ticket:
     '🎫 *New Support Ticket*\nFrom: {{email}}\nSubject: {{subject}}',
+  message_template_verification:
+    '🔎 *Verification Request Submitted*\nRequest: {{ticket_id}}\nPlatform: {{account_type}}\nName: {{name}}\nEmail: {{email}}',
 }
 
 async function readConfig() {
@@ -63,6 +66,7 @@ export async function sendOrderNotification(type, vars) {
     if (type === 'agency'  && !cfg.notify_agency)   return
     if (type === 'deposit' && !cfg.notify_deposits)  return
     if (type === 'ticket'  && !cfg.notify_tickets)   return
+    if (type === 'verification' && !cfg.notify_verification) return
 
     const recipient = cfg.recipient_number?.replace(/\D/g, '')
     if (!recipient) return

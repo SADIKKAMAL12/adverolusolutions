@@ -542,6 +542,7 @@ function StructureBuilderInner() {
 
   const [name, setName] = useState('Untitled structure');
   const [draftId, setDraftId] = useState(null);
+  const [editingOrderId, setEditingOrderId] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [connectionType, setConnectionType] = useState('admin');
@@ -626,7 +627,8 @@ function StructureBuilderInner() {
   useEffect(() => {
     if (!store.loadDraftData) return;
     const ld = store.loadDraftData;
-    setDraftId(ld.id);
+    setDraftId(ld.orderId ? null : ld.id);
+    setEditingOrderId(ld.orderId || null);
     setName(ld.name || 'Untitled structure');
     const loadedNodes = Array.isArray(ld.nodes) ? ld.nodes : [];
     setNodes(loadedNodes);
@@ -744,21 +746,37 @@ function StructureBuilderInner() {
         balance: typeof s.balance === 'number' ? s.balance - orderTotal : s.balance,
       }));
       setShowConfirmModal(false);
-      setNodes([]); setEdges([]); setName('Untitled structure'); setDraftId(null);
+      setNodes([]); setEdges([]); setName('Untitled structure'); setDraftId(null); setEditingOrderId(null);
       setOrderResult({ orderCode: order.order_code || order.id, name: orderName, total: orderTotal });
     } catch (err) { setError(err.message); setShowConfirmModal(false); }
     finally { setBusy(false); }
   };
 
+  const saveOrderEdits = async () => {
+    if (!nodes.length) { setError('Add at least one asset.'); return; }
+    setBusy(true); setError(null); setSuccess(null);
+    try {
+      const saved = await api.put('/api/structure-orders', { id: editingOrderId, name, nodes, edges });
+      setStore(s => ({
+        ...s,
+        structureOrders: (s.structureOrders || []).map(o => o.id === editingOrderId
+          ? { ...o, name, nodes_json: JSON.stringify(nodes), edges_json: JSON.stringify(edges), total_price: saved.total_price, node_count: nodes.length, edge_count: edges.length }
+          : o),
+      }));
+      setSuccess('Order updated.');
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+
   const loadDraft = d => {
-    setDraftId(d.id); setName(d.name || 'Untitled structure');
+    setDraftId(d.id); setEditingOrderId(null); setName(d.name || 'Untitled structure');
     const loadedNodes = d.nodes || [];
     setNodes(loadedNodes); setEdges(d.edges || []);
     syncIdRef(loadedNodes);
     setSuccess(`Loaded "${d.name || d.id}".`);
   };
 
-  const clearCanvas = () => { setNodes([]); setEdges([]); setDraftId(null); setName('Untitled structure'); };
+  const clearCanvas = () => { setNodes([]); setEdges([]); setDraftId(null); setEditingOrderId(null); setName('Untitled structure'); };
 
   const startNewStructure = () => {
     if (nodes.length > 0) {
@@ -886,6 +904,7 @@ function StructureBuilderInner() {
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Builder</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.02em', lineHeight: 1.2, marginTop: 2 }}>
               Structure <span className="serif" style={{ color: 'var(--accent)', fontStyle: 'italic' }}>builder</span>
+              {editingOrderId && <span style={{ marginLeft: 10, fontSize: 11, fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Editing pending order</span>}
             </div>
           </div>
 {/* Actions */}
@@ -893,12 +912,20 @@ function StructureBuilderInner() {
             <button className="btn" onClick={startNewStructure} style={{ gap: 6 }}>
               <Icon name="plus" size={14} />New Structure
             </button>
-            <button className="btn" onClick={saveDraft} disabled={busy}>
-              {busy && <Spinner size={13} />}<Icon name="package" size={14} />Save draft
-            </button>
-            <button className="btn btn--accent" onClick={submitOrder} disabled={busy || !nodes.length}>
-              <Icon name="send" size={14} />Submit
-            </button>
+            {editingOrderId ? (
+              <button className="btn btn--accent" onClick={saveOrderEdits} disabled={busy || !nodes.length}>
+                {busy && <Spinner size={13} />}<Icon name="package" size={14} />Save changes
+              </button>
+            ) : (
+              <>
+                <button className="btn" onClick={saveDraft} disabled={busy}>
+                  {busy && <Spinner size={13} />}<Icon name="package" size={14} />Save draft
+                </button>
+                <button className="btn btn--accent" onClick={submitOrder} disabled={busy || !nodes.length}>
+                  <Icon name="send" size={14} />Submit
+                </button>
+              </>
+            )}
           </div>
         </div>
 

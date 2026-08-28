@@ -56,13 +56,14 @@ const SUPABASE_HOST = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  // Filterfy client widget (test integration) — remove if the trial doesn't stick
+  "script-src 'self' https://dev.filterfy.io",
   // React's style props require unsafe-inline; Google Fonts stylesheet also needs it
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   // Supabase Storage for proof images and payment-method logos
   `img-src 'self' data: blob: ${SUPABASE_HOST ? 'https://' + SUPABASE_HOST : ''}`.trim(),
-  "connect-src 'self'",
+  "connect-src 'self' https://dev.filterfy.io",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -158,18 +159,6 @@ app.all('/api/*', async (req, res) => {
     console.error(`[api] ${req.method} ${pathname} →`, err.message)
     if (!res.headersSent) res.status(500).json({ error: err.message })
   }
-})
-
-// ── Standalone landing / login / signup (isolated bundle, does not touch the
-// main app build at all) — shown only to anonymous visitors on these exact
-// paths; logged-in visitors fall through to the normal app untouched. ───────
-const landingDistDir = path.join(__dirname, 'dist-landing')
-app.use('/landing-static', express.static(landingDistDir))
-
-app.get(['/', '/login', '/register'], (req, res, next) => {
-  const user = verifyToken(tokenFromRequest(req))
-  if (user) return next() // logged in — defer to the normal app below
-  res.sendFile(path.join(landingDistDir, 'index.html'))
 })
 
 // ── Static files (built frontend) ────────────────────────────────────────────

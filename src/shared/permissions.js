@@ -7,6 +7,7 @@ export const USER_PAGES = [
   { key: "balance",              label: "Balance & Deposits",   description: "Add funds, deposit and view transaction history" },
   { key: "support",              label: "Support",              description: "Create and track support tickets with the team" },
   { key: "structure-builder",   label: "Structure Builder",    description: "Build and submit custom ad structure orders" },
+  { key: "phone-verifications", label: "Phone Verifications",  description: "Buy temporary phone numbers to receive SMS verification codes" },
   { key: "purchase-history",    label: "Purchase History",     description: "View previously purchased account history" },
 ];
 

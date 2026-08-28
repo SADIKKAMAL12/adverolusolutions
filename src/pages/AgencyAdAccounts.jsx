@@ -67,7 +67,12 @@ function CreateModal({ onClose, onCreated, currentBalance = 0 }) {
   const goNext = (e) => {
     e.preventDefault();
     for (const f of platformFields) {
-      if (f.required && !extraFields[f.key]) {
+      if (!f.required) continue;
+      const val = extraFields[f.key];
+      const empty = f.multiple
+        ? !Array.isArray(val) || val.filter(v => v && v.trim()).length === 0
+        : !val;
+      if (empty) {
         setError(`"${f.label}" is required`);
         return;
       }
@@ -87,9 +92,13 @@ function CreateModal({ onClose, onCreated, currentBalance = 0 }) {
     setError(null);
     setBusy(true);
     try {
+      const cleanedExtra = {};
+      for (const [k, v] of Object.entries(extraFields)) {
+        cleanedExtra[k] = Array.isArray(v) ? v.filter(item => item && item.trim()) : v;
+      }
       const created = await api.post('/api/ad-account-requests', {
         ...form,
-        ...extraFields,
+        ...cleanedExtra,
         user_id: user?.id,
         amount: total,
       });
@@ -205,7 +214,39 @@ function CreateModal({ onClose, onCreated, currentBalance = 0 }) {
                           ? <span style={{ color: 'var(--accent)' }}> *</span>
                           : <span style={{ color: 'var(--muted-2)' }}> (optional)</span>}
                       </label>
-                      {f.type === 'textarea' ? (
+                      {f.multiple ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {(extraFields[f.key] && extraFields[f.key].length ? extraFields[f.key] : ['']).map((val, i, list) => (
+                            <div key={i} style={{ display: 'flex', gap: 8 }}>
+                              <input className="input" type={f.type === 'textarea' ? 'text' : (f.type || 'text')} value={val} placeholder={f.placeholder}
+                                onChange={e => {
+                                  const next = [...list];
+                                  next[i] = e.target.value;
+                                  setExtraFields(x => ({ ...x, [f.key]: next }));
+                                }} />
+                              {list.length > 1 && (
+                                <button type="button" className="btn" onClick={() => {
+                                  setExtraFields(x => ({ ...x, [f.key]: list.filter((_, idx) => idx !== i) }));
+                                }}>✕</button>
+                              )}
+                            </div>
+                          ))}
+                          {(!f.maxEntries || (extraFields[f.key]?.length || 1) < f.maxEntries) && (
+                            <button type="button" className="btn" style={{ alignSelf: 'flex-start' }}
+                              onClick={() => {
+                                const list = extraFields[f.key] && extraFields[f.key].length ? extraFields[f.key] : [''];
+                                setExtraFields(x => ({ ...x, [f.key]: [...list, ''] }));
+                              }}>
+                              + Add {f.label}
+                            </button>
+                          )}
+                          {f.maxEntries && (
+                            <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                              {(extraFields[f.key]?.filter(v => v && v.trim()).length || 0)} / {f.maxEntries} used
+                            </span>
+                          )}
+                        </div>
+                      ) : f.type === 'textarea' ? (
                         <textarea className="input" style={{ minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }}
                           value={extraFields[f.key] || ''} onChange={e => setExtraFields(x => ({ ...x, [f.key]: e.target.value }))}
                           placeholder={f.placeholder} />

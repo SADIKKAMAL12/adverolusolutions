@@ -61,7 +61,7 @@ export default function Dashboard() {
     Promise.all([
       api.get(`/api/transactions?user_id=${user.id}&order=id&ascending=false`),
       api.get(`/api/deposits?user_id=${user.id}`),
-      api.get(`/api/orders?user_id=${user.id}`),
+      api.get(`/api/purchases?user_id=${user.id}`),
     ])
       .then(([transactions, deposits, orders]) => {
         if (cancelled) return;
