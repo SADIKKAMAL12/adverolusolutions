@@ -157,7 +157,7 @@ function ActivePurchaseCard({ purchase, onUpdate }) {
 
     const poll = async () => {
       try {
-        const data = await api.get(`/api/textverified?action=status&id=${purchase.id}`);
+        const data = await api.get(`/api/adversolutionsotp?action=status&id=${purchase.id}`);
         onUpdate(data);
       } catch { /* keep waiting, transient network errors shouldn't stop polling */ }
     };
@@ -178,7 +178,7 @@ function ActivePurchaseCard({ purchase, onUpdate }) {
     setCancelling(true);
     setCancelError('');
     try {
-      const updated = await api.post('/api/textverified?action=cancel', { id: purchase.id });
+        const updated = await api.post('/api/adversolutionsotp?action=cancel', { id: purchase.id });
       onUpdate(updated);
     } catch (e) {
       setCancelError(e.message);
@@ -378,7 +378,7 @@ export default function PhoneVerifications() {
     setLoading(true);
     try {
       const params = mode === 'rental' ? `&mode=rental&duration=${duration}` : '';
-      const svc = await api.get(`/api/textverified?action=services${params}`);
+        const svc = await api.get(`/api/adversolutionsotp?action=services${params}`);
       setServices(Array.isArray(svc) ? svc : []);
     } catch (e) {
       setError(e.message);
@@ -389,7 +389,7 @@ export default function PhoneVerifications() {
 
   const loadHistory = async () => {
     try {
-      const hist = await api.get('/api/textverified?action=history');
+        const hist = await api.get('/api/adversolutionsotp?action=history');
       setHistory(Array.isArray(hist) ? hist : []);
     } catch (e) {
       setError(e.message);
@@ -422,7 +422,7 @@ export default function PhoneVerifications() {
     if (!service) return;
     setBuying(service.service_name);
     try {
-      const purchase = await api.post('/api/textverified?action=purchase', {
+        const purchase = await api.post('/api/adversolutionsotp?action=purchase', {
         service_name: service.service_name,
         mode,
         duration: mode === 'rental' ? duration : undefined,

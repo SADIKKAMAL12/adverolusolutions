@@ -25,7 +25,7 @@ function readFileAsBase64(file) {
   })
 }
 
-export default function AdminTextVerifiedSettingsPage() {
+export default function AdminAdversolutionsOtpSettingsPage() {
   const { theme } = useTheme()
   const TC = getThemeColors(theme === 'dark')
   const navigate = useNavigate()
@@ -56,7 +56,7 @@ export default function AdminTextVerifiedSettingsPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const cfg = await request('/api/admin/textverified-settings')
+      const cfg = await request('/api/admin/adversolutionsotp-settings')
       setApiKeyLast4(cfg.api_key_last4 || '')
       setApiKeyConfigured(!!cfg.api_key_configured)
       setApiEmail(cfg.api_email || '')
@@ -74,7 +74,7 @@ export default function AdminTextVerifiedSettingsPage() {
 
   useEffect(() => {
     if (!apiKeyConfigured) return
-    request('/api/admin/textverified-settings?action=balance')
+    request('/api/admin/adversolutionsotp-settings?action=balance')
       .then(d => setBalance(d.balance))
       .catch(e => setBalanceError(e.message))
   }, [apiKeyConfigured])
@@ -90,7 +90,7 @@ export default function AdminTextVerifiedSettingsPage() {
         allowed_services: allowedServices,
       }
       if (apiKeyInput.trim()) body.api_key = apiKeyInput.trim()
-      const result = await request('/api/admin/textverified-settings', {
+      const result = await request('/api/admin/adversolutionsotp-settings', {
         method: 'POST',
         body: JSON.stringify(body),
       })
@@ -110,7 +110,7 @@ export default function AdminTextVerifiedSettingsPage() {
   const runSearch = async () => {
     setSearching(true)
     try {
-      const results = await request(`/api/admin/textverified-settings?action=catalog&q=${encodeURIComponent(searchQuery)}`)
+      const results = await request(`/api/admin/adversolutionsotp-settings?action=catalog&q=${encodeURIComponent(searchQuery)}`)
       setSearchResults(Array.isArray(results) ? results.slice(0, 30) : [])
     } catch (e) {
       setError(e.message)
@@ -141,7 +141,7 @@ export default function AdminTextVerifiedSettingsPage() {
     setCheckingAvailability(true)
     setError('')
     try {
-      const results = await request('/api/admin/textverified-settings?action=availability')
+      const results = await request('/api/admin/adversolutionsotp-settings?action=availability')
       const map = {}
       for (const r of results) map[r.service_name] = { verification: r.verification, rental: r.rental }
       setAvailability(map)
@@ -154,8 +154,8 @@ export default function AdminTextVerifiedSettingsPage() {
 
   return (
     <PageShell
-      title="TextVerified Integration"
-      subtitle="Connect your TextVerified account, set your markup, and choose which services customers can buy phone verifications for."
+      title="AdverSolutions OTP"
+      subtitle="Configure phone verification services, pricing, and availability."
       actions={[
         <Btn key="back" variant="outline" onClick={() => navigate('/admin/settings')}>← Back to System Settings</Btn>,
       ]}
@@ -179,7 +179,7 @@ export default function AdminTextVerifiedSettingsPage() {
                 <Input
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder={apiKeyConfigured ? `•••• ${apiKeyLast4} (saved — enter a new key to change it)` : 'Paste your TextVerified API V2 Key'}
+                  placeholder={apiKeyConfigured ? `•••• ${apiKeyLast4} (saved — enter a new key to change it)` : 'Paste your provider API V2 key'}
                 />
               </div>
               <div>
@@ -189,7 +189,7 @@ export default function AdminTextVerifiedSettingsPage() {
             </div>
             {apiKeyConfigured && (
               <div className="mt-3 text-xs text-slate-500">
-                {balance != null ? `TextVerified balance: $${Number(balance).toFixed(2)}` : balanceError ? `Couldn't fetch balance: ${balanceError}` : 'Checking balance…'}
+                {balance != null ? `Provider balance: $${Number(balance).toFixed(2)}` : balanceError ? `Couldn't fetch provider balance: ${balanceError}` : 'Checking balance…'}
               </div>
             )}
           </Card>
@@ -197,7 +197,7 @@ export default function AdminTextVerifiedSettingsPage() {
           <Card style={{ padding: 20, marginBottom: 16 }}>
             <div className={`text-sm font-bold mb-1 ${TC.text}`}>Markup</div>
             <div className="text-xs text-slate-400 mb-4">
-              Customer price = TextVerified's price × (1 + markup%). Verifications and rentals are priced independently, since they're different products with different costs.
+              Customer price is the provider price × (1 + markup%). Verifications and rentals are priced independently.
             </div>
             <div className="flex flex-wrap gap-8">
               <div>
@@ -232,7 +232,7 @@ export default function AdminTextVerifiedSettingsPage() {
               )}
             </div>
             <div className="text-xs text-slate-400 mb-3">
-              Shows whether TextVerified supports each service for verification and/or rental. Stock still fluctuates minute to minute — this isn't a live stock guarantee, just whether the service is offered at all.
+              Shows whether the provider supports each service for verification and/or rental. Stock still fluctuates minute to minute.
             </div>
 
             {allowedServices.length > 0 && (
@@ -287,7 +287,7 @@ export default function AdminTextVerifiedSettingsPage() {
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search TextVerified's catalog, e.g. whatsapp"
+                  placeholder="Search the provider catalog, e.g. whatsapp"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch() } }}
                 />
                 <button

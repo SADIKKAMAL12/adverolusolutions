@@ -179,7 +179,7 @@ export default defineConfig({
             './src/admin/AdminOrderNotificationsPage.jsx',
   './src/admin/AdminVerificationsPage.jsx',
   './src/admin/AdminVerificationSettingsPage.jsx',
-  './src/admin/AdminTextVerifiedSettingsPage.jsx',
+          './src/admin/AdminAdversolutionsOtpSettingsPage.jsx',
             './src/admin/AdminStructureAssetsPage.jsx',
             './src/admin/AdminAppearancePage.jsx',
           ],

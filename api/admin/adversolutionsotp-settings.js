@@ -1,5 +1,5 @@
 import { getSupabase } from '../lib/supabase-server.js'
-import { getAccountBalance, searchServices, getVerificationPrice, getRentalPrice } from '../lib/textverified.js'
+import { getAccountBalance, searchServices, getVerificationPrice, getRentalPrice } from '../lib/adversolutionsotp.js'
 
 const DEFAULTS = {
   api_key: '',

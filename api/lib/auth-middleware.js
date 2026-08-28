@@ -1,14 +1,17 @@
 import crypto from 'crypto'
 
-const SECRET = process.env.SESSION_SECRET || 'adver-dev-secret-change-in-prod'
 const COOKIE = 'adver_session'
 const MAX_AGE = 7 * 24 * 60 * 60 // 7 days in seconds
+
+function getSecret() {
+  return process.env.SESSION_SECRET || 'adver-dev-secret-change-in-prod'
+}
 
 // ── Token sign / verify ───────────────────────────────────────────────────────
 
 export function signToken(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const sig  = crypto.createHmac('sha256', SECRET).update(data).digest('base64url')
+  const sig  = crypto.createHmac('sha256', getSecret()).update(data).digest('base64url')
   return `${data}.${sig}`
 }
 
@@ -18,7 +21,7 @@ export function verifyToken(token) {
   if (i < 1) return null
   const data = token.slice(0, i)
   const sig  = token.slice(i + 1)
-  const exp  = crypto.createHmac('sha256', SECRET).update(data).digest('base64url')
+  const exp  = crypto.createHmac('sha256', getSecret()).update(data).digest('base64url')
   try {
     const sBuf = Buffer.from(sig, 'base64url')
     const eBuf = Buffer.from(exp, 'base64url')
@@ -85,7 +88,7 @@ export function isPublicPath(method, pathname, searchParams) {
   if (pathname === '/api/admin/upload-asset' && method === 'POST') return true
   // Called by Supabase pg_cron (no browser session) — gated by its own
   // shared-secret check inside the handler, not session auth.
-  if (pathname === '/api/textverified' && method === 'POST' && searchParams?.get?.('action') === 'sweep') return true
+  if (pathname === '/api/adversolutionsotp' && method === 'POST' && searchParams?.get?.('action') === 'sweep') return true
   if (pathname === '/api/verification-requests' && method === 'GET' && searchParams?.get?.('token')) return true
   if (pathname === '/api/verification-requests' && method === 'PATCH' && searchParams?.get?.('token')) return true
   // Registration goes exclusively through /api/auth/register now — the old

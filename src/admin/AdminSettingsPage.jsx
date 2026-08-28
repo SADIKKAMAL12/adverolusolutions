@@ -89,7 +89,7 @@ const CONFIG_PAGES = [
   { label: 'Email OTP', icon: <Mail size={19} />, desc: 'Configure SMTP and email OTP verification', path: '/admin/email-otp' },
   { label: 'Order Notifications', icon: <Bell size={19} />, desc: 'WhatsApp alerts for orders & top-ups', path: '/admin/order-notifications' },
   { label: 'Account Verifications', icon: <ShieldCheck size={19} />, desc: 'Generate verification links and track their status', path: '/admin/verifications' },
-  { label: 'TextVerified Integration', icon: <PhoneCall size={19} />, desc: 'Resell SMS phone verifications via TextVerified', path: '/admin/textverified-settings' },
+  { label: 'AdverSolutions OTP', icon: <PhoneCall size={19} />, desc: 'Manage phone verification services', path: '/admin/adversolutionsotp-settings' },
 ];
 
 function Section({ theme, title, sub, children, action }) {

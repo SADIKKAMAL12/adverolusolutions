@@ -3,7 +3,7 @@ import {
   createVerification, getVerificationDetails, getVerificationPrice,
   getSmsForVerification, cancelVerification,
   getRentalPrice, createRental, refundRental, resolveRentalDetailsHref,
-} from './lib/textverified.js'
+} from './lib/adversolutionsotp.js'
 
 const RENTAL_DURATIONS = ['oneDay', 'threeDay', 'sevenDay', 'fourteenDay', 'thirtyDay']
 

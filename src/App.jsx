@@ -40,7 +40,7 @@ import AdminPolicyPaymentsPage from './admin/AdminPolicyPaymentsPage.jsx';
 import AdminAccountTypesPage from './admin/AdminAccountTypesPage.jsx';
 import AdminVerificationsPage from './admin/AdminVerificationsPage.jsx';
 import AdminVerificationSettingsPage from './admin/AdminVerificationSettingsPage.jsx';
-import AdminTextVerifiedSettingsPage from './admin/AdminTextVerifiedSettingsPage.jsx';
+import AdminAdversolutionsOtpSettingsPage from './admin/AdminAdversolutionsOtpSettingsPage.jsx';
 import PolicyPortalPage from './policies/PolicyPortalPage.jsx';
 import SavedStructuresPage from './pages/SavedStructuresPage.jsx';
 
@@ -136,7 +136,7 @@ function AdminApp() {
           <Route path="/admin/policies/account-types" element={<AdminAccountTypesPage />} />
           <Route path="/admin/verifications" element={<AdminVerificationsPage />} />
           <Route path="/admin/verification-settings" element={<AdminVerificationSettingsPage />} />
-          <Route path="/admin/textverified-settings" element={<AdminTextVerifiedSettingsPage />} />
+          <Route path="/admin/adversolutionsotp-settings" element={<AdminAdversolutionsOtpSettingsPage />} />
           <Route path="/admin/settings" element={<AdminSettingsPage paymentMethods={store.paymentMethods || []} businessTypes={store.businessTypes || []} setStore={setStore} />} />
           <Route path="/admin/whatsapp" element={<AdminWhatsAppPage />} />
           <Route path="/admin/email-otp" element={<AdminEmailOTPPage />} />
