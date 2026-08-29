@@ -22,7 +22,8 @@
     "nodemailer": "^9.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-i18next": "^15.5.1"
+    "react-i18next": "^15.5.1",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",

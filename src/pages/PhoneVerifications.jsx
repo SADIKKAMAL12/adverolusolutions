@@ -316,6 +316,31 @@ function BuyConfirmModal({ service, mode, duration, currentBalance, onConfirm, o
   );
 }
 
+function PurchaseErrorModal({ message, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,8,0.62)', backdropFilter: 'blur(8px)', display: 'grid', placeItems: 'center', zIndex: 110, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, overflow: 'hidden', background: 'var(--bg-card)', borderRadius: 24, boxShadow: '0 24px 70px -24px rgba(0,0,0,.45)', border: '1px solid var(--line)' }}>
+        <div style={{ height: 5, background: 'linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #f59e0b))' }} />
+        <div style={{ padding: '28px 28px 24px', textAlign: 'center' }}>
+          <div style={{ width: 58, height: 58, margin: '0 auto 16px', borderRadius: 18, display: 'grid', placeItems: 'center', color: 'var(--accent)', background: 'var(--accent-50)', border: '1px solid color-mix(in srgb, var(--accent) 18%, transparent)' }}>
+            <Icon.Alert width={25} height={25} />
+          </div>
+          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 850, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Purchase unavailable</h3>
+          <p style={{ maxWidth: 300, margin: '10px auto 0', fontSize: 14, lineHeight: 1.6, color: 'var(--muted)' }}>{message}</p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+            <button onClick={onClose} style={{ flex: 1, height: 44, borderRadius: 100, background: 'var(--bg-sunken)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
+              Close
+            </button>
+            <button onClick={() => { onClose(); window.location.hash = '#/support'; }} style={{ flex: 1.25, height: 44, borderRadius: 100, background: 'var(--accent)', border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, boxShadow: '0 10px 22px -10px color-mix(in srgb, var(--accent) 70%, transparent)' }}>
+              Contact support
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- service card ---------------- */
 function ServiceCard({ service, mode, buying, onBuy }) {
   const [hover, setHover] = useState(false);
@@ -371,6 +396,7 @@ export default function PhoneVerifications() {
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(null); // service_name currently being purchased
   const [confirmService, setConfirmService] = useState(null);
+  const [purchaseError, setPurchaseError] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -411,7 +437,7 @@ export default function PhoneVerifications() {
     setSuccess(null);
     if (service.price == null) return;
     if (currentBalance < service.price) {
-      setError('Insufficient balance. Please top up your wallet first.');
+      setPurchaseError('Not enough wallet balance. Please contact support.');
       return;
     }
     setConfirmService(service);
@@ -434,7 +460,12 @@ export default function PhoneVerifications() {
         : `Number purchased for ${service.label}. Waiting for the code below.`);
       setConfirmService(null);
     } catch (e) {
-      setError(e.message);
+      const providerError = String(e.message || '').toLowerCase();
+      if (providerError.includes('out of stock') || providerError.includes('unavailable') || providerError.includes('insufficient balance')) {
+        setPurchaseError('Not enough wallet balance. Please contact support.');
+      } else {
+        setError(e.message);
+      }
       setConfirmService(null);
     } finally {
       setBuying(null);
@@ -532,6 +563,9 @@ export default function PhoneVerifications() {
             onConfirm={confirmBuy}
             onClose={() => setConfirmService(null)}
           />
+        )}
+        {purchaseError && (
+          <PurchaseErrorModal message={purchaseError} onClose={() => setPurchaseError(null)} />
         )}
       </div>
     </Layout>
